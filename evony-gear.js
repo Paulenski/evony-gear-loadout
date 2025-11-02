@@ -83,25 +83,39 @@
     return parts.join(', ');
   }
 
-  function parseAndAddStats(attributeString, statsObject) {
-    if (!attributeString) return;
-    const tokens = attributeString
-      .split(/[,;]+/)
-      .map((s) => s.trim())
-      .filter(Boolean);
+  // Parse a string like "Name: +12.5%", "Name +12.5%", "Name %: +12.5", "Name:+1,500"
+function parseAndAddStats(attributeString, statsObject) {
+  if (!attributeString) return;
 
-    tokens.forEach((tok) => {
-      const m = tok.match(/^(.+?):\s*([+-]?\d+(?:\.\d+)?)\s*(%?)$/);
+  attributeString
+    .split(/[,;]+/)              // comma or semicolon separated
+    .map(s => s.trim())
+    .filter(Boolean)
+    .forEach(tok => {
+      // Allow optional colon, allow 1,234 style, capture optional %
+      // 1: stat name (greedy but minimal via +?), 2: signed number with commas, 3: % if present
+      const m = tok.match(/^(.+?)(?::)?\s*([+-]?\d[\d,]*(?:\.\d+)?)\s*(%?)$/i);
       if (!m) return;
+
       let name = m[1].trim();
-      const value = parseFloat(m[2]);
-      const hasPercentInValue = m[3] === '%';
-      const nameHasPercent = /%/.test(name);
-      if (hasPercentInValue && !nameHasPercent) name = `${name} %`;
+      let numStr = m[2].replace(/,/g, '');  // drop thousands separators
+      const hadPercentInValue = m[3] === '%';
+      const nameAlreadyHasPercent = /%/.test(name);
+
+      const value = parseFloat(numStr);
+      if (isNaN(value)) return;
+
+      // If the value had a % but the name doesn't, append a % marker to stat name
+      if (hadPercentInValue && !nameAlreadyHasPercent) {
+        name = `${name} %`;
+      }
+
+      // Canonicalize "Name  %" -> "Name %"
       name = name.replace(/\s+%$/, ' %');
-      if (!isNaN(value)) statsObject[name] = (statsObject[name] || 0) + value;
+
+      statsObject[name] = (statsObject[name] || 0) + value;
     });
-  }
+}
 
   // Fetch from Apps Script
   async function fetchJSON(url) {
@@ -171,12 +185,9 @@ function setOrderIndex(str) {
 }
 // Safely escape any text we inject into HTML
 function esc(s) {
-  return (s || '')
-    .replace(/&/g, '&')
-    .replace(/</g, '<')
-    .replace(/>/g, '>')
-    .replace(/"/g, '"')
-    .replace(/'/g, ''');
+  const div = document.createElement('div');
+  div.textContent = s ?? '';
+  return div.innerHTML;
 }
 
 // Return up to 4 attribute lines from attr1..attr4; fallback to splitting a single "attributes" string
