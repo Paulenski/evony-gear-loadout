@@ -163,6 +163,37 @@
     return setName || item?.tier || '';
   }
 
+function setOrderIndex(str) {
+  const key = setOrderKey(str);
+  if (!key) return 999; // unknown sets go to the end
+  const idx = SET_ORDER.indexOf(key);
+  return idx === -1 ? 999 : idx;
+}
+// Safely escape any text we inject into HTML
+function esc(s) {
+  return (s || '')
+    .replace(/&/g, '&')
+    .replace(/</g, '<')
+    .replace(/>/g, '>')
+    .replace(/"/g, '"')
+    .replace(/'/g, ''');
+}
+
+// Return up to 4 attribute lines from attr1..attr4; fallback to splitting a single "attributes" string
+function getAttributesArray(item) {
+  const parts = [];
+  ['attr1', 'attr2', 'attr3', 'attr4'].forEach((k) => {
+    const v = (item?.[k] || '').trim();
+    if (v) parts.push(v);
+  });
+  if (!parts.length && item?.attributes) {
+    // split a combined attributes cell into tokens
+    const tokens = item.attributes.split(/[,;]+/).map(s => s.trim()).filter(Boolean);
+    parts.push(...tokens);
+  }
+  return parts.slice(0, 4);
+}
+
   // PUBLIC functions
   window.openGearModal =
     window.openGearModal ||
@@ -239,16 +270,26 @@
 
   items.forEach((item) => {
     const idx = itemsFlat.length;
-    itemsFlat.push(item);
-    const isSelected = S.equippedGear[slot]?.name === item.name;
-    const attrText = getAttributesString(item) || 'No attributes';
+itemsFlat.push(item);
+const isSelected = S.equippedGear[slot]?.name === item.name;
 
-    html += `
-      <div class="item-card ${isSelected ? 'selected' : ''}" data-item-idx="${idx}">
-        <div class="item-name" style="color:#ffd700;font-weight:800;">${item.name}</div>
-        <div class="item-attributes">${attrText}</div>
-      </div>
-    `;
+// Build bullet list from attr1..attr4 (fallback to split attributes string)
+const attrs = getAttributesArray(item);
+const listHtml = attrs.length
+  ? `<ul class="attr-list">${attrs.map(a => `<li>${esc(a)}</li>`).join('')}</ul>`
+  : `<ul class="attr-list"><li>No attributes</li></ul>`;
+
+// Keep a hidden plain-text attributes div for searching/filtering
+const hiddenAttrText = esc(getAttributesString(item) || '');
+
+html += `
+  <div class="item-card ${isSelected ? 'selected' : ''}" data-item-idx="${idx}">
+    <div class="item-name" style="color:#ffd700;font-weight:800;">${esc(item.name)}</div>
+    ${listHtml}
+    <div class="item-attributes" style="display:none;">${hiddenAttrText}</div>
+  </div>
+`;
+
   });
 
   html += `
@@ -287,16 +328,23 @@
     };
 
   window.filterItems =
-    window.filterItems ||
-    function filterItems() {
-      const q = (document.getElementById('itemSearch')?.value || '').toLowerCase();
-      document.querySelectorAll('#itemModal .item-card').forEach((card) => {
-        const name = card.querySelector('.item-name')?.textContent.toLowerCase() || '';
-        const attrs = card.querySelector('.item-attributes')?.textContent.toLowerCase() || '';
-        const isRemove = card.dataset.itemIdx === '-1';
-        card.style.display = isRemove || name.includes(q) || attrs.includes(q) ? 'block' : 'none';
-      });
-    };
+  window.filterItems ||
+  function filterItems() {
+    const q = (document.getElementById('itemSearch')?.value || '').toLowerCase();
+    document.querySelectorAll('#itemModal .item-card').forEach((card) => {
+      const name = card.querySelector('.item-name')?.textContent.toLowerCase() || '';
+      const attrHidden = card.querySelector('.item-attributes')?.textContent.toLowerCase() || '';
+      const attrListText = card.querySelector('.attr-list')?.textContent.toLowerCase() || '';
+      const isRemove = card.dataset.itemIdx === '-1';
+      const matches = (
+        isRemove ||
+        name.includes(q) ||
+        attrHidden.includes(q) ||
+        attrListText.includes(q)
+      );
+      card.style.display = matches ? 'block' : 'none';
+    });
+  };
 
   window.selectItem =
     window.selectItem ||
@@ -515,11 +563,4 @@ function setOrderKey(str) {
     if (needles.some(term => norm.includes(term))) return key;
   }
   return null;
-}
-
-function setOrderIndex(str) {
-  const key = setOrderKey(str);
-  if (!key) return 999; // unknown sets go to the end
-  const idx = SET_ORDER.indexOf(key);
-  return idx === -1 ? 999 : idx;
 }
