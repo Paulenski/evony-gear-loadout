@@ -67,22 +67,22 @@ function itemMatchesFilters(item) {
 function applyFilters() {
   const modal = document.getElementById('itemModal');
   if (!modal) return;
-  
-  // Filter tier sections
+
   document.querySelectorAll('.tier-section').forEach(section => {
     const cards = section.querySelectorAll('.item-card');
     let visibleCount = 0;
-    
+
     cards.forEach(card => {
       const idx = parseInt(card.dataset.itemIdx, 10);
       if (idx === -1) {
-        card.style.display = 'block'; // Always show "Remove Item"
+        // Keep "Remove Item" visible always
+        card.style.display = 'block';
         return;
       }
-      
+
       const modalBody = document.getElementById('modalBody');
       const item = modalBody?._itemsCache?.[idx];
-      
+
       if (item && itemMatchesFilters(item)) {
         card.style.display = 'block';
         visibleCount++;
@@ -90,10 +90,12 @@ function applyFilters() {
         card.style.display = 'none';
       }
     });
-    
-    // Hide entire section if no visible items
-    section.style.display = visibleCount > 0 ? 'block' : 'none';
+
+    // Section display handled by updateTierCounts now
   });
+
+  // NEW: refresh counts and section visibility
+  updateTierCounts();
 }
 
 // Toggle troop filter
@@ -290,6 +292,28 @@ function updateFilterButtons() {
     div.innerHTML = `<strong>⚠️ Error:</strong> ${message}`;
     container.insertBefore(div, container.firstChild);
   }
+// Recompute the "X items" badge for each tier header based on visible cards
+function updateTierCounts() {
+  document.querySelectorAll('#itemModal .tier-section').forEach(section => {
+    const count = Array.from(section.querySelectorAll('.item-card'))
+      .filter(card => {
+        // Ignore the "Remove Item" card (idx === -1)
+        const idx = parseInt(card.dataset.itemIdx, 10);
+        if (isNaN(idx) || idx < 0) return false;
+
+        // Check visibility. Prefer style check; if using CSS toggles, also check offsetParent.
+        return card.style.display !== 'none';
+      }).length;
+
+    const badge = section.querySelector('.tier-count');
+    if (badge) {
+      badge.textContent = `${count} ${count === 1 ? 'item' : 'items'}`;
+    }
+
+    // Hide entire section if none visible
+    section.style.display = count > 0 ? 'block' : 'none';
+  });
+}
 
   // Attribute handling
   function getAttributesString(item) {
@@ -523,7 +547,7 @@ window.openGearModal = function openGearModal(slot) {
 
   // Count only items that match the current filters
   const filteredCount = items.filter(item => itemMatchesFilters(item)).length;
-  const countLabel = `$${filteredCount}$$ {filteredCount === 1 ? 'item' : 'items'}`;
+  const countLabel = `${filteredCount} ${filteredCount === 1 ? 'item' : 'items'}`;
 
   html += `
     <div class="tier-section ${hasSelectedInGroup ? 'selected' : ''}">
@@ -597,24 +621,27 @@ window.filterItems = function filterItems() {
     const name = card.querySelector('.item-name')?.textContent.toLowerCase() || '';
     const attrHidden = card.querySelector('.item-attributes')?.textContent.toLowerCase() || '';
     const attrListText = card.querySelector('.attr-list')?.textContent.toLowerCase() || '';
-    const isRemove = card.dataset.itemIdx === '-1';
-    
-    // Check search match
+    const idx = parseInt(card.dataset.itemIdx, 10);
+    const isRemove = idx === -1;
+
+    // Search match
     const searchMatches = (
       isRemove ||
       name.includes(q) ||
       attrHidden.includes(q) ||
       attrListText.includes(q)
     );
-    
-    // Check filter match
-    const idx = parseInt(card.dataset.itemIdx, 10);
+
+    // Filter match
     const modalBody = document.getElementById('modalBody');
     const item = (idx >= 0 && modalBody?._itemsCache) ? modalBody._itemsCache[idx] : null;
     const filterMatches = !item || itemMatchesFilters(item);
-    
+
     card.style.display = (searchMatches && filterMatches) ? 'block' : 'none';
   });
+
+  // NEW: refresh counts and section visibility
+  updateTierCounts();
   
   // Update section visibility
   document.querySelectorAll('.tier-section').forEach(section => {
@@ -1356,4 +1383,23 @@ function updateSetBonuses() {
     updateStatsDisplay();
     updateSetBonuses();
   });
+// Inside the IIFE, add this after DOMContentLoaded
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadAllData();
+  loadFromLocalStorage();
+  updateGearDisplay();
+  updateStatsDisplay();
+  updateSetBonuses();
+  
+  // ADD THIS EVENT DELEGATION
+  document.querySelectorAll('.gear-slot').forEach(slot => {
+    slot.addEventListener('click', function() {
+      const slotType = this.dataset.slot;
+      if (slotType) {
+        window.openGearModal(slotType);
+      }
+    });
+  });
+});
+
 })();
