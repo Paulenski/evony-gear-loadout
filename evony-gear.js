@@ -61,6 +61,74 @@
     return (item?.setname || item?.set || '').toString().trim();
   }
 
+// Normalize a stat key for matching (lowercase, single spaces, remove trailing " %")
+function normStatKey(s) {
+  return String(s || '')
+    .toLowerCase()
+    .replace(/\s+%$/, '')         // remove trailing % marker we add in parsing
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Map attribute priority within a troop group
+function subAttrIndex(statKey) {
+  // Stat key already normalized. Look for specific attr tokens.
+  if (/\battack\b/.test(statKey))  return 0;
+  if (/\bhp\b/.test(statKey))      return 1;
+  if (/\bdef(ense)?\b/.test(statKey)) return 2;
+  return 50; // unknown sub-attr goes after the known trio
+}
+
+// Main group order
+const GROUP_ORDER = [
+  'ground', 'attacking ground',
+  'ranged', 'attacking ranged',
+  'mounted', 'attacking mounted',
+  'siege', 'attacking siege'
+];
+
+// Identify the group for a given stat
+function groupIndex(statKey) {
+  // statKey is normalized already
+  for (let i = 0; i < GROUP_ORDER.length; i++) {
+    const g = GROUP_ORDER[i];
+    if (statKey.startsWith(g + ' ')) return i;
+  }
+  // March specials
+  if (/^march size\b/.test(statKey))  return GROUP_ORDER.length + 0; // after all troop groups
+  if (/^march speed\b/.test(statKey)) return GROUP_ORDER.length + 1;
+  return 999; // everything else
+}
+
+// Compute a sortable tuple for a stat name
+function statSortTuple(name) {
+  const key = normStatKey(name);            // e.g., "attacking ranged attack"
+  const gi  = groupIndex(key);
+
+  // Inside troop groups, use Attack, HP, Defense ordering
+  if (gi >= 0 && gi < GROUP_ORDER.length) {
+    const sub = subAttrIndex(key);
+    return [gi, sub, key];                  // group → subattr → name
+  }
+
+  // March Size, March Speed: keep their internal order, no sub ordering
+  if (gi === GROUP_ORDER.length)     return [gi, 0, key]; // March Size
+  if (gi === GROUP_ORDER.length + 1) return [gi, 0, key]; // March Speed
+
+  // Everything else: push to the end, then A→Z
+  return [gi, 0, key];
+}
+
+// Comparator for Object.entries(stats)
+function compareStats([nameA], [nameB]) {
+  const a = statSortTuple(nameA);
+  const b = statSortTuple(nameB);
+  // Compare tuple parts in order
+  if (a[0] !== b[0]) return a[0] - b[0];
+  if (a[1] !== b[1]) return a[1] - b[1];
+  return a[2].localeCompare(b[2]);
+}
+
   // UI helper
   function showError(message) {
     const container = document.querySelector('.container');
@@ -436,6 +504,7 @@ html += `
 
     const statsDisplay = document.getElementById('statsDisplay');
     if (!statsDisplay) return;
+
     if (!Object.keys(stats).length) {
       statsDisplay.innerHTML =
         '<p style="text-align:center;color:#888;">Equip items to see stats</p>';
@@ -443,16 +512,16 @@ html += `
     }
 
     const html = Object.entries(stats)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(
-        ([k, v]) => `
+      .sort(compareStats)
+      .map(([k, v]) => `
         <div class="stat-item">
           <span class="stat-label">${k}</span>
           <span class="stat-value">${k.endsWith(' %') ? `+${v.toLocaleString()}%` : `+${v.toLocaleString()}`}</span>
         </div>
-      `
-      )
+      `)
       .join('');
+
+    // WRITE THE TOTALS TO THE DOM (this line was missing)
     statsDisplay.innerHTML = html;
   }
 
@@ -478,50 +547,50 @@ html += `
       return;
     }
 
-   // Build compact containers
-let html = '<div class="set-grid">';
+    // Build compact containers
+    let html = '<div class="set-grid">';
 
-// Sort by preferred order using the display name (set if present, else tier)
-const normKeysSorted = Object.keys(counts).sort((a, b) => {
-  const aName = (S.setBonusIndex[a]?.displayKey || a);
-  const bName = (S.setBonusIndex[b]?.displayKey || b);
-  const ia = setOrderIndex(aName);
-  const ib = setOrderIndex(bName);
-  if (ia !== ib) return ia - ib;
-  return aName.localeCompare(bName);
-});
+    // Sort by preferred order using the display name (set if present, else tier)
+    const normKeysSorted = Object.keys(counts).sort((a, b) => {
+      const aName = (S.setBonusIndex[a]?.displayKey || a);
+      const bName = (S.setBonusIndex[b]?.displayKey || b);
+      const ia = setOrderIndex(aName);
+      const ib = setOrderIndex(bName);
+      if (ia !== ib) return ia - ib;
+      return aName.localeCompare(bName);
+    });
 
-normKeysSorted.forEach((normKey) => {
-  const count = counts[normKey];
-  const entry = S.setBonusIndex[normKey];
-  const displayName = entry?.displayKey || normKey;
+    normKeysSorted.forEach((normKey) => {
+      const count = counts[normKey];
+      const entry = S.setBonusIndex[normKey];
+      const displayName = entry?.displayKey || normKey;
 
-  const lines = [
-    { th: '2/2', pc: 2, text: entry?.pieces?.[2] || '—' },
-    { th: '4/4', pc: 4, text: entry?.pieces?.[4] || '—' },
-    { th: '6/6', pc: 6, text: entry?.pieces?.[6] || '—' },
-  ];
+      const lines = [
+        { th: '2/2', pc: 2, text: entry?.pieces?.[2] || '—' },
+        { th: '4/4', pc: 4, text: entry?.pieces?.[4] || '—' },
+        { th: '6/6', pc: 6, text: entry?.pieces?.[6] || '—' },
+      ];
 
-  html += `
-    <div class="set-box">
-      <div class="set-title">
-        <span>${displayName}</span>
-        <span class="count">${count}/6</span>
-      </div>
-      <div class="set-lines">
-        ${lines.map(line => `
-          <div class="set-line ${count >= line.pc && line.text !== '—' ? 'active' : 'inactive'}">
-            <div class="th">${line.th}</div>
-            <div class="desc">${line.text}</div>
+      html += `
+        <div class="set-box">
+          <div class="set-title">
+            <span>${displayName}</span>
+            <span class="count">${count}/6</span>
           </div>
-        `).join('')}
-      </div>
-    </div>
-  `;
-});
+          <div class="set-lines">
+            ${lines.map(line => `
+              <div class="set-line ${count >= line.pc && line.text !== '—' ? 'active' : 'inactive'}">
+                <div class="th">${line.th}</div>
+                <div class="desc">${line.text}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    });
 
-html += '</div>';
-holder.innerHTML = html;
+    html += '</div>';
+    holder.innerHTML = html;
   }
 
   // Storage
