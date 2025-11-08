@@ -50,22 +50,25 @@ h1 {
   transform: translateY(-1px);
 }
 
-/* Character-centric stage */
+/* Character-centric stage - TIGHT GRID LAYOUT */
 .stage {
   position: relative;
   width: 100%;
-  aspect-ratio: 16/9;
+  max-width: 500px;           /* constrain width for tight grid */
+  margin: 0 auto 24px;        /* center the grid */
+  padding: 20px;
   border: 2px solid var(--stage-border);
   border-radius: 12px;
   background:
     radial-gradient(60% 50% at 50% 50%, #2c2c2c 0%, #1b1b1b 100%);
-  overflow: hidden;
-  margin-bottom: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 480px;          /* give enough height for 3 slots + captions */
 }
 
 /* General placeholder box (replace later with your general image/model) */
 .general-placeholder {
-  /* you already have position, transform, width, aspect-ratio, border, etc. */
   display: grid;             /* center the image */
   place-items: center;
   overflow: hidden;          /* ensure no image overflow over the border */
@@ -82,18 +85,36 @@ h1 {
   margin-top: 4px;
 }
 
-/* Column containers for slots */
-.slot-col {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  display: grid;
-  grid-auto-flow: row;        /* explicit row flow */
-  grid-auto-rows: var(--slot-size);
-  row-gap: var(--slot-gap);
+.general-image {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;               /* preserve aspect ratio */
+  height: auto;              /* preserve aspect ratio */
+  object-fit: contain;       /* fit inside the frame without cropping */
+  display: block;
 }
-.slot-col.left  { left: clamp(10px, 4%, 28px); }
-.slot-col.right { right: clamp(10px, 4%, 28px); }
+
+/* Column containers for slots - FIXED POSITIONING FOR TIGHT GRID */
+.slot-col {
+  display: grid;
+  grid-auto-flow: row;
+  row-gap: 28px;              /* increased gap to accommodate captions */
+  flex-shrink: 0;             /* prevent columns from shrinking */
+}
+.slot-col.left  { 
+  margin-right: auto;
+}
+.slot-col.right { 
+  margin-left: auto;
+}
+
+/* Wrap each slot so we can put a caption under it */
+.slot-wrap {
+  display: grid;
+  justify-items: center;
+  row-gap: 8px;               /* increased spacing between slot and caption */
+  margin-bottom: 12px;        /* extra space below caption to prevent overlap */
+}
 
 /* Individual gear slots */
 .gear-slot {
@@ -124,29 +145,23 @@ h1 {
   inset: 0;
 }
 
-/* Small persistent slot name */
-.slot-name-tag {
-  position: absolute;
-  left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,.75);
+/* Name of the selected piece (or slot label) below the box */
+.slot-caption {
   color: #ddd;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   text-align: center;
-  padding: 2px 4px;
+  line-height: 1.3;
+  max-width: 120px;
+  min-height: 2.6em;          /* ensure space for 2 lines of text */
+  white-space: normal;        /* allow text wrapping */
+  overflow: visible;          /* ensure text isn't cut off */
+  word-wrap: break-word;
+  padding: 4px 2px;
 }
 
-/* Alias (if older HTML uses this class) */
-.gear-slot-label {
-  position: absolute;
-  left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,.75);
-  color: #ddd;
-  font-size: 10px;
-  font-weight: 700;
-  text-align: center;
-  padding: 2px 4px;
-}
+/* Hide the old overlay label if you had it */
+.slot-name-tag, .gear-slot-label { display: none !important; }
 
 /* Tier badge and check overlay (when equipped) */
 .badge-tier {
@@ -272,6 +287,7 @@ h1 {
   border: 1px solid #4a4a4a;
   transition: border-color .15s ease, background-color .15s ease, box-shadow .15s ease;
   position: relative;
+  cursor: pointer;
 }
 .item-card:hover {
   border-color: #ffd700;
@@ -285,6 +301,18 @@ h1 {
 }
 .item-name { font-weight: 800; color: var(--accent); margin-bottom: 6px; }
 .item-attributes { font-size: 12px; color: #ccc; line-height: 1.4; }
+
+.attr-list {
+  margin: 6px 0 0;
+  padding-left: 16px;   /* space for bullet */
+  color: #ccc;
+  font-size: 12px;
+  line-height: 1.35;
+}
+.attr-list li {
+  margin: 2px 0;
+  list-style: disc;
+}
 
 /* Decorative divider between groups */
 .tier-divider {
@@ -302,14 +330,104 @@ h1 {
   padding: 18px;
   border-radius: 8px;
 }
-.stats-summary h2 { color: var(--accent); margin-bottom: 10px; }
-.stat-item {
-  display: flex; justify-content: space-between;
-  padding: 8px 0; border-bottom: 1px solid #555;
+.stats-summary h2 { 
+  color: var(--accent); 
+  margin-bottom: 10px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
 }
-.stat-item:last-child { border-bottom: none; }
+
+/* Condensed header counter (G/R/M/S) */
+.totals-condensed {
+  color: #bbb;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* Compact stat line: name and value close together */
+.stats-summary .stat-item {
+  display: grid;
+  grid-template-columns: auto auto; /* size to content for both columns */
+  justify-content: start;           /* keep them together on the left */
+  align-items: baseline;
+  column-gap: 10px;                 /* small gap between name and value */
+  padding: 6px 0;
+  border-bottom: 1px solid #555;
+}
+.stats-summary .stat-item:last-child { border-bottom: none; }
+
+/* Cosmetic: colon after the label for readability */
+.stats-summary .stat-label::after {
+  content: ':';
+  margin-left: 2px;
+  opacity: 0.7;
+}
+
 .stat-label { color: #ccc; }
 .stat-value { color: var(--ok); font-weight: 800; }
+
+/* Totals grid + cards */
+.totals-section {
+  margin-top: 12px;
+}
+.totals-section h3 {
+  color: var(--accent);
+  margin: 10px 0 8px;
+  font-size: 16px;
+}
+
+.totals-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+  gap: 12px;
+}
+.totals-card {
+  background: #3a3a3a;
+  border: 2px solid #555;
+  border-radius: 8px;
+  padding: 12px;
+}
+.totals-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-weight: 800;
+  color: #ffd700;
+  margin-bottom: 6px;
+  gap: 8px;
+}
+.totals-lines {
+  display: grid;
+  gap: 6px;
+}
+.totals-line {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  column-gap: 8px;
+  font-size: 13px;
+}
+.totals-line .name { color: #ddd; }
+.totals-line .value { color: #90EE90; font-weight: 800; }
+.totals-line.set .name::after {
+  content: ' (set bonus)';
+  color: #ffd700;
+  font-weight: 700;
+  margin-left: 4px;
+}
+
+.totals-subtotal {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid #555;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-weight: 800;
+}
+.totals-subtotal .label { color: #ccc; }
+.totals-subtotal .sum   { color: #90EE90; }
 
 .set-bonuses { margin-top: 20px; }
 .set-bonuses h2 { text-align: center; color: var(--accent); margin-bottom: 12px; }
@@ -368,57 +486,62 @@ h1 {
 ::-webkit-scrollbar-thumb { background: #555; border-radius: 5px; }
 ::-webkit-scrollbar-thumb:hover { background: #777; }
 
-/* Responsive */
-@media (max-width: 800px) {
-  :root { --slot-size: 56px; --slot-gap: 12px; }
-  .set-grid { grid-template-columns: 1fr; }
-}
-@supports not (aspect-ratio: 1 / 1) {
-  .stage { height: 560px; }
+/* Make slots bigger on desktop */
+@media (min-width: 1025px) {
+  :root { 
+    --slot-size: 96px; 
+    --slot-gap: 20px; 
+  }
+  
+  .stage {
+    max-width: 600px;         /* wider grid for larger slots */
+    min-height: 600px;        /* taller for larger slots + captions */
+  }
+  
+  .slot-col {
+    row-gap: 36px;            /* more space for larger captions */
+  }
+  
+  .slot-wrap {
+    row-gap: 10px;
+    margin-bottom: 16px;
+  }
+  
+  .slot-caption {
+    font-size: 12px;
+    max-width: 140px;
+    min-height: 2.8em;
+  }
 }
 
+/* Optional: constrain width on large screens so lines aren't too long */
+@media (min-width: 1024px) {
+  .stats-summary {
+    max-width: 640px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
 
-.general-image {
-  max-width: 100%;
-  max-height: 100%;
-  width: auto;               /* preserve aspect ratio */
-  height: auto;              /* preserve aspect ratio */
-  object-fit: contain;       /* fit inside the frame without cropping */
-  display: block;
-}
-.attr-list {
-  margin: 6px 0 0;
-  padding-left: 16px;   /* space for bullet */
-  color: #ccc;
-  font-size: 12px;
-  line-height: 1.35;
-}
-.attr-list li {
-  margin: 2px 0;
-  list-style: disc;
-}
 /* ========== Tablet (≤ 1024px) ========== */
 @media (max-width: 1024px) {
   :root {
-    --slot-size: 58px;
-    --slot-gap: 14px;
+    --slot-size: 72px;
+    --slot-gap: 16px;
   }
 
-  /* Make the stage a bit taller for better fit */
   .stage {
-    aspect-ratio: 4 / 3;
+    max-width: 480px;
+    min-height: 520px;
   }
 
-  /* Pull columns a bit closer to the image */
-  .slot-col.left  { left: clamp(8px, 3%, 20px); }
-  .slot-col.right { right: clamp(8px, 3%, 20px); }
-
-  /* Slightly reduce label footprint */
-  .slot-name-tag { font-size: 9.5px; padding: 2px 3px; }
-
-  /* General image/frame sizing (uncomment to override inline width) */
-  /* .general-placeholder { width: 34% !important; } */
-  .general-image { max-height: 86%; }
+  .slot-col {
+    row-gap: 30px;
+  }
+  
+  .slot-wrap {
+    margin-bottom: 14px;
+  }
 
   /* 2 columns for set boxes on tablets */
   .set-grid {
@@ -440,23 +563,28 @@ h1 {
 /* ========== Small tablets / large phones (≤ 768px) ========== */
 @media (max-width: 768px) {
   :root {
-    --slot-size: 54px;
-    --slot-gap: 12px;
+    --slot-size: 64px;
+    --slot-gap: 14px;
   }
 
   .stage {
-    aspect-ratio: 4 / 3;
-    border-radius: 10px;
+    max-width: 400px;
+    min-height: 480px;
+    padding: 16px;
   }
 
-  .slot-col.left  { left: clamp(6px, 3%, 16px); }
-  .slot-col.right { right: clamp(6px, 3%, 16px); }
-
-  .slot-name-tag { font-size: 9px; padding: 2px; }
-
-  /* General frame (uncomment if inline width exists) */
-  /* .general-placeholder { width: 38% !important; } */
-  .general-image { max-height: 88%; }
+  .slot-col {
+    row-gap: 26px;
+  }
+  
+  .slot-wrap {
+    margin-bottom: 12px;
+  }
+  
+  .slot-caption {
+    font-size: 10px;
+    max-width: 100px;
+  }
 
   /* Buttons: make more tappable and possibly full width */
   .action-buttons {
@@ -482,7 +610,7 @@ h1 {
   .item-card { padding: 10px 10px 10px 12px; }
   .attr-list { font-size: 11.5px; }
 
-  /* Keep set grid single-column for readability */
+  /* Keep set grid and totals grid single-column for readability */
   .set-grid {
     grid-template-columns: 1fr;
     gap: 10px;
@@ -493,32 +621,36 @@ h1 {
   }
   .set-line { font-size: 12.5px; grid-template-columns: 38px 1fr; }
   .set-line .th { font-size: 12px; }
+  
+  .totals-grid { grid-template-columns: 1fr; }
 }
 
 /* ========== Phones portrait (≤ 600px) ========== */
 @media (max-width: 600px) {
   :root {
-    --slot-size: 50px;
-    --slot-gap: 10px;
+    --slot-size: 56px;
+    --slot-gap: 12px;
   }
 
   .stage {
-    aspect-ratio: 10 / 12; /* closer to phone screen */
-    border-width: 1.5px;
+    max-width: 360px;
+    min-height: 440px;
+    padding: 14px;
   }
 
-  .slot-col.left  { left: 6px; }
-  .slot-col.right { right: 6px; }
-
-  /* Reduce label density or hide if overlapping */
-  .slot-name-tag {
-    font-size: 8.5px;
-    padding: 1.5px 2px;
+  .slot-col {
+    row-gap: 24px;
   }
-
-  /* General image tweak (uncomment to override inline) */
-  /* .general-placeholder { width: 46% !important; } */
-  .general-image { max-height: 90%; max-width: 52%; }
+  
+  .slot-wrap {
+    margin-bottom: 10px;
+  }
+  
+  .slot-caption {
+    font-size: 9px;
+    max-width: 90px;
+    min-height: 2.4em;
+  }
 
   /* Headings and sections */
   h1 { font-size: 20px; margin-bottom: 14px; }
@@ -547,23 +679,29 @@ h1 {
 /* ========== Small phones (≤ 400px) ========== */
 @media (max-width: 400px) {
   :root {
-    --slot-size: 46px;
-    --slot-gap: 9px;
+    --slot-size: 50px;
+    --slot-gap: 10px;
   }
 
-  .stage { aspect-ratio: 9 / 11; }
-
-  .slot-col.left  { left: 4px; }
-  .slot-col.right { right: 4px; }
-
-  /* If labels crowd, hide them for tiny screens */
-  .slot-name-tag {
-    display: none;
+  .stage { 
+    max-width: 320px;
+    min-height: 400px;
+    padding: 12px;
   }
 
-  /* General image (last-resort override if inline width exists) */
-  /* .general-placeholder { width: 54% !important; } */
-  .general-image { max-width: 60%; max-height: 92%; }
+  .slot-col {
+    row-gap: 22px;
+  }
+  
+  .slot-wrap {
+    margin-bottom: 8px;
+  }
+
+  .slot-caption {
+    font-size: 8.5px;
+    max-width: 80px;
+    min-height: 2.2em;
+  }
 
   /* Modal tighter */
   .modal-content {
@@ -599,28 +737,464 @@ h1 {
   }
 }
 
-/* Compact stat line: name and value close together */
-.stats-summary .stat-item {
-  display: grid;
-  grid-template-columns: auto auto; /* size to content for both columns */
-  justify-content: start;           /* keep them together on the left */
-  align-items: baseline;
-  column-gap: 10px;                 /* small gap between name and value */
-  padding: 6px 0;
+/* Fallback for browsers without aspect-ratio support */
+@supports not (aspect-ratio: 1 / 1) {
+  .stage { height: 560px; }
+}
+/* Filter section */
+.filter-section {
+  margin-bottom: 12px;
+  padding: 12px;
+  background: #333;
+  border-radius: 6px;
+  border: 1px solid #444;
 }
 
-/* Cosmetic: colon after the label for readability */
-.stats-summary .stat-label::after {
-  content: ':';
-  margin-left: 2px;
-  opacity: 0.7;
+.filter-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffd700;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-/* Optional: constrain width on large screens so lines aren't too long */
-@media (min-width: 1024px) {
-  .stats-summary {
-    max-width: 640px;
-    margin-left: auto;
-    margin-right: auto;
+.filter-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filter-btn {
+  flex: 1;
+  min-width: 80px;
+  padding: 8px 12px;
+  background: #2a2a2a;
+  border: 2px solid #555;
+  border-radius: 6px;
+  color: #ccc;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-transform: capitalize;
+}
+
+.filter-btn:hover {
+  background: #3a3a3a;
+  border-color: #777;
+  color: #fff;
+}
+
+.filter-btn.active {
+  background: linear-gradient(135deg, #ffd700 0%, #c39a00 100%);
+  border-color: #ffd700;
+  color: #000;
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
+}
+
+.filter-btn:active {
+  transform: translateY(1px);
+}
+
+/* Responsive filter buttons */
+@media (max-width: 600px) {
+  .filter-btn {
+    min-width: 70px;
+    padding: 7px 10px;
+    font-size: 12px;
+  }
+  
+  .filter-label {
+    font-size: 11px;
   }
 }
+/* Substat breakdown grid with fixed heights */
+.substat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin: 12px 0;
+  align-items: stretch; /* Make all columns same height */
+}
+
+.substat-col {
+  background: #2a2a2a;
+  border: 2px solid #444;
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  min-height: 200px; /* Ensure minimum height for alignment */
+}
+
+.substat-header {
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #ffd700;
+  text-align: center;
+  margin-bottom: 10px;
+  letter-spacing: 0.8px;
+  border-bottom: 2px solid #ffd700;
+  padding-bottom: 6px;
+  flex-shrink: 0; /* Don't compress header */
+}
+
+.substat-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+  flex-grow: 1; /* Take up available space */
+  overflow-y: auto; /* Scroll if too many items */
+  max-height: 300px; /* Cap the height */
+}
+
+.substat-line {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  background: #333;
+  border-radius: 6px;
+  border-left: 3px solid transparent;
+  transition: all 0.2s ease;
+  flex-shrink: 0; /* Prevent line compression */
+}
+
+.substat-line:hover {
+  background: #3a3a3a;
+  border-left-color: #ffd700;
+}
+
+.substat-line.set {
+  background: #2d3d2d;
+  border-left-color: #4CAF50;
+}
+
+.substat-line.set .substat-name::after {
+  content: ' (set)';
+  color: #ffd700;
+  font-size: 10px;
+  font-weight: 700;
+  margin-left: 4px;
+}
+
+.substat-name {
+  font-size: 12px;
+  color: #ddd;
+  line-height: 1.3;
+  word-wrap: break-word;
+}
+
+.substat-value {
+  font-size: 13px;
+  font-weight: 800;
+  color: #90EE90;
+  white-space: nowrap;
+}
+
+.substat-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  border-top: 2px solid #555;
+  background: linear-gradient(180deg, transparent, rgba(76,175,80,0.12));
+  border-radius: 6px;
+  margin-top: auto; /* Push to bottom */
+  flex-shrink: 0; /* Don't compress total */
+}
+
+.total-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #ccc;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.total-value {
+  font-size: 15px;
+  font-weight: 800;
+  color: #4CAF50;
+}
+
+/* Make all totals-cards the same height in a row */
+.totals-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+  gap: 12px;
+  align-items: stretch; /* Make cards same height */
+}
+
+.totals-card {
+  background: #3a3a3a;
+  border: 2px solid #555;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  min-height: 300px; /* Minimum height for consistency */
+}
+
+/* Grand total in card title */
+.totals-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-weight: 800;
+  color: #ffd700;
+  margin-bottom: 12px;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.totals-title .grand-total {
+  font-size: 16px;
+  color: #4CAF50;
+  font-weight: 800;
+  background: rgba(76,175,80,0.15);
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(76,175,80,0.4);
+}
+
+/* Other stats section */
+.other-stats {
+  margin-top: 12px;
+  padding: 10px;
+  background: #2a2a2a;
+  border: 2px solid #444;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.other-stats-header {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #ffd700;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #444;
+  letter-spacing: 0.5px;
+}
+
+.other-stats .totals-line {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  padding: 6px 8px;
+  font-size: 12px;
+  background: #333;
+  border-radius: 6px;
+  margin-bottom: 4px;
+  border-left: 3px solid transparent;
+}
+
+.other-stats .totals-line:last-child {
+  margin-bottom: 0;
+}
+
+.other-stats .totals-line.set {
+  border-left-color: #4CAF50;
+  background: #2d3d2d;
+}
+
+.other-stats .totals-line .name {
+  color: #ddd;
+}
+
+.other-stats .totals-line .value {
+  color: #90EE90;
+  font-weight: 800;
+}
+
+/* Scrollbar styling for substat-lines */
+.substat-lines::-webkit-scrollbar {
+  width: 6px;
+}
+
+.substat-lines::-webkit-scrollbar-track {
+  background: #2a2a2a;
+  border-radius: 3px;
+}
+
+.substat-lines::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 3px;
+}
+
+.substat-lines::-webkit-scrollbar-thumb:hover {
+  background: #666;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+  .substat-grid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+  }
+  
+  .totals-card {
+    min-height: 280px;
+  }
+  
+  .substat-col {
+    min-height: 180px;
+  }
+}
+
+@media (max-width: 768px) {
+  .substat-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  
+  .substat-col {
+    padding: 8px;
+    min-height: 150px;
+  }
+  
+  .totals-card {
+    min-height: auto; /* Allow natural height on mobile */
+  }
+  
+  .substat-header {
+    font-size: 12px;
+  }
+  
+  .substat-name {
+    font-size: 11px;
+  }
+  
+  .substat-value {
+    font-size: 12px;
+  }
+  
+  .total-value {
+    font-size: 14px;
+  }
+  
+  .totals-title .grand-total {
+    font-size: 14px;
+    padding: 3px 10px;
+  }
+  
+  .totals-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .substat-line {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  
+  .substat-value {
+    text-align: left;
+    padding-left: 8px;
+  }
+  
+  .substat-lines {
+    max-height: 250px;
+  }
+}
+
+@media (max-width: 400px) {
+  .other-stats .totals-line {
+    font-size: 11px;
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  
+  .other-stats .totals-line .value {
+    text-align: left;
+    padding-left: 8px;
+  }
+}
+/* Totals header table */
+.totals-header-table {
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto 20px;
+  border-collapse: collapse;
+  background: #2a2a2a;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+.totals-header-table thead {
+  background: linear-gradient(180deg, #3a3a3a 0%, #333 100%);
+  border-bottom: 2px solid #ffd700;
+}
+
+.totals-header-table th {
+  padding: 10px 12px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #ffd700;
+}
+
+.totals-header-table th:first-child {
+  text-align: left;
+  padding-left: 16px;
+}
+
+.totals-header-table tbody tr {
+  border-bottom: 1px solid #333;
+  transition: background 0.2s ease;
+}
+
+.totals-header-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.totals-header-table tbody tr:hover {
+  background: #333;
+}
+
+.totals-header-table td {
+  padding: 10px 12px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.totals-header-table .troop-name {
+  text-align: left;
+  padding-left: 16px;
+  color: #fff;
+  font-weight: 800;
+}
+
+.totals-header-table .stat-value {
+  color: #90EE90;
+  font-family: 'Courier New', monospace;
+  white-space: nowrap;
+}
+
+.totals-header-table .stat-value.attack {
+  color: #ff9999;
+}
+
+.totals-header-table .stat-value.defense {
+  color: #9999ff;
+}
+
+.totals-header-table .stat-value.hp {
+  color: #99ff99;
+}
+
+.totals-header-table .stat-value.total {
+  color: #ffd700;
+  font-weight: 800;
+  background: rgba
