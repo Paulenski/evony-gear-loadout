@@ -598,3 +598,29 @@ h1 {
     transition: none !important;
   }
 }
+
+/* Compact stat line: name and value close together */
+.stats-summary .stat-item {
+  display: grid;
+  grid-template-columns: auto auto; /* size to content for both columns */
+  justify-content: start;           /* keep them together on the left */
+  align-items: baseline;
+  column-gap: 10px;                 /* small gap between name and value */
+  padding: 6px 0;
+}
+
+/* Cosmetic: colon after the label for readability */
+.stats-summary .stat-label::after {
+  content: ':';
+  margin-left: 2px;
+  opacity: 0.7;
+}
+
+/* Optional: constrain width on large screens so lines aren't too long */
+@media (min-width: 1024px) {
+  .stats-summary {
+    max-width: 640px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
