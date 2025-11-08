@@ -521,7 +521,9 @@ window.openGearModal = function openGearModal(slot) {
   const items = groups[name];
   const hasSelectedInGroup = items.some((it) => S.equippedGear[slot]?.name === it.name);
 
-  const countLabel = `$${items.length}$$ {items.length === 1 ? 'item' : 'items'}`; // ✅ FIXED
+  // Count only items that match the current filters
+  const filteredCount = items.filter(item => itemMatchesFilters(item)).length;
+  const countLabel = `$${filteredCount}$$ {filteredCount === 1 ? 'item' : 'items'}`;
 
   html += `
     <div class="tier-section ${hasSelectedInGroup ? 'selected' : ''}">
