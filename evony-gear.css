@@ -406,7 +406,7 @@ h1 {
 
   /* Make the stage a bit taller for better fit */
   .stage {
-    aspect-ratio: 2 / 3;
+    aspect-ratio: 4 / 3;
   }
 
   /* Pull columns a bit closer to the image */
@@ -445,7 +445,7 @@ h1 {
   }
 
   .stage {
-    aspect-ratio: 3 / 4;
+    aspect-ratio: 4 / 3;
     border-radius: 10px;
   }
 
@@ -503,7 +503,7 @@ h1 {
   }
 
   .stage {
-    aspect-ratio: 10 / 16; /* closer to phone screen */
+    aspect-ratio: 10 / 12; /* closer to phone screen */
     border-width: 1.5px;
   }
 
@@ -551,7 +551,7 @@ h1 {
     --slot-gap: 9px;
   }
 
-  .stage { aspect-ratio: 9 / 16; }
+  .stage { aspect-ratio: 9 / 11; }
 
   .slot-col.left  { left: 4px; }
   .slot-col.right { right: 4px; }
