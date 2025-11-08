@@ -406,7 +406,7 @@ h1 {
 
   /* Make the stage a bit taller for better fit */
   .stage {
-    aspect-ratio: 4 / 5;
+    aspect-ratio: 2 / 3;
   }
 
   /* Pull columns a bit closer to the image */
