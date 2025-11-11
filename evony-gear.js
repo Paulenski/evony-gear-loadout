@@ -36,31 +36,98 @@
   };
 
 const TROOP_TYPES = ['ground', 'ranged', 'mounted', 'siege'];
-const BUFF_TYPES = ['attack', 'defense', 'hp'];
+const BUFF_TYPES = ['attack', 'defense', 'hp', 'debuff'];
+const DEBUFF_TYPES = ['attack', 'defense', 'hp'];
 
 // Filter state
 const filterState = {
   activeTroop: null,
-  activeBuff: null
+  activeBuff: null,
+  activeDebuffType: null,
+  itemTier: 'standard' // 'standard' or 'civilization'
 };
 
-// Check if an item matches the active filters
+// Check if an attribute contains enemy/debuff language
+function isDebuffAttribute(attrText) {
+  const lower = attrText.toLowerCase();
+  return lower.includes('enemy') || lower.includes('opposing');
+}
+
+// Extract troop type from attribute text
+function extractTroopFromAttr(attrText) {
+  const lower = attrText.toLowerCase();
+  for (const troop of TROOP_TYPES) {
+    if (lower.includes(troop)) {
+      return troop;
+    }
+  }
+  return null;
+}
+
+// Extract buff type from attribute text
+function extractBuffFromAttr(attrText) {
+  const lower = attrText.toLowerCase();
+  if (lower.includes('attack')) return 'attack';
+  if (lower.includes('defense') || lower.includes('defence')) return 'defense';
+  if (lower.includes('hp') || lower.includes('health')) return 'hp';
+  return null;
+}
+
+// Check if an item matches the active filters using AND logic
+// Check if an item matches the active filters using AND logic
 function itemMatchesFilters(item) {
-  if (!filterState.activeTroop) return true; // No filter active
-  
   const attrs = getAttributesString(item).toLowerCase();
   
-  // Check if item has the selected troop type
-  const hasTroop = attrs.includes(filterState.activeTroop);
+  // Check item tier filter first
+  const itemTierType = (item.tier || '').toLowerCase();
+  const isCivilization = itemTierType.includes('civilization');
+  const isStandard = !isCivilization;
   
-  if (!filterState.activeBuff) {
-    // Only troop filter active
-    return hasTroop;
-  }
+  if (filterState.itemTier === 'civilization' && !isCivilization) return false;
+  if (filterState.itemTier === 'standard' && !isStandard) return false;
   
-  // Both filters active: check troop AND buff type
-  const hasBuff = attrs.includes(filterState.activeBuff);
-  return hasTroop && hasBuff;
+  // No troop filter active = show all
+  if (!filterState.activeTroop) return true;
+  
+  // Get all attribute lines
+  const attrLines = getAttributesString(item).split(/[,;]+/).map(s => s.trim()).filter(Boolean);
+  
+  // Check if ANY attribute line matches ALL active filters (AND logic)
+  const hasMatchingLine = attrLines.some(line => {
+    const lineLower = line.toLowerCase();
+    
+    // Extract all troop types from this line (handles "Ground and Mounted")
+    const troopsInLine = extractTroopsFromAttr(line);
+    
+    // Must contain the selected troop type
+    if (!troopsInLine.includes(filterState.activeTroop)) return false;
+    
+    // If no buff filter, troop match is enough
+    if (!filterState.activeBuff) return true;
+    
+    // If debuff filter is active
+    if (filterState.activeBuff === 'debuff') {
+      // Must be a debuff line
+      if (!isDebuffAttribute(line)) return false;
+      
+      // If debuff type is selected, must match that type
+      if (filterState.activeDebuffType) {
+        const buffType = extractBuffFromAttr(line);
+        return buffType === filterState.activeDebuffType;
+      }
+      
+      // Debuff selected but no specific type = show all debuffs for this troop
+      return true;
+    }
+    
+    // Regular buff filter (attack, defense, hp)
+    // Must contain the buff type AND NOT be a debuff
+    if (isDebuffAttribute(line)) return false;
+    const buffType = extractBuffFromAttr(line);
+    return buffType === filterState.activeBuff;
+  });
+  
+  return hasMatchingLine;
 }
 
 // Apply filters to visible items
@@ -90,11 +157,8 @@ function applyFilters() {
         card.style.display = 'none';
       }
     });
-
-    // Section display handled by updateTierCounts now
   });
 
-  // NEW: refresh counts and section visibility
   updateTierCounts();
 }
 
@@ -103,11 +167,13 @@ window.toggleTroopFilter = function(troop) {
   if (filterState.activeTroop === troop) {
     // Turn off
     filterState.activeTroop = null;
-    filterState.activeBuff = null; // Reset buff filter too
+    filterState.activeBuff = null;
+    filterState.activeDebuffType = null;
   } else {
     // Turn on
     filterState.activeTroop = troop;
-    filterState.activeBuff = null; // Reset buff filter when switching troops
+    filterState.activeBuff = null;
+    filterState.activeDebuffType = null;
   }
   
   updateFilterButtons();
@@ -121,16 +187,108 @@ window.toggleBuffFilter = function(buff) {
   if (filterState.activeBuff === buff) {
     // Turn off
     filterState.activeBuff = null;
+    filterState.activeDebuffType = null;
   } else {
     // Turn on
     filterState.activeBuff = buff;
+    filterState.activeDebuffType = null;
   }
   
   updateFilterButtons();
   applyFilters();
 };
 
-// ADD THESE AFTER THE FILTER STATE SECTION (after the troop/buff filters):
+// Toggle debuff type filter
+window.toggleDebuffTypeFilter = function(debuffType) {
+  if (!filterState.activeTroop || filterState.activeBuff !== 'debuff') return;
+  
+  if (filterState.activeDebuffType === debuffType) {
+    // Turn off
+    filterState.activeDebuffType = null;
+  } else {
+    // Turn on
+    filterState.activeDebuffType = debuffType;
+  }
+  
+  updateFilterButtons();
+  applyFilters();
+};
+
+// Toggle item tier filter (Standard vs Civilization)
+window.toggleItemTier = function(tier) {
+  filterState.itemTier = tier;
+  filterState.activeTroop = null;
+  filterState.activeBuff = null;
+  filterState.activeDebuffType = null;
+  
+  updateFilterButtons();
+  
+  // Reload modal content with new tier filter
+  if (S.currentSlot) {
+    window.openGearModal(S.currentSlot);
+  }
+};
+
+// Update button states
+function updateFilterButtons() {
+  // Item tier buttons
+  ['standard', 'civilization'].forEach(tier => {
+    const btn = document.getElementById(`filter-tier-${tier}`);
+    if (btn) {
+      if (filterState.itemTier === tier) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    }
+  });
+  
+  // Troop buttons
+  TROOP_TYPES.forEach(troop => {
+    const btn = document.getElementById(`filter-troop-${troop}`);
+    if (btn) {
+      if (filterState.activeTroop === troop) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    }
+  });
+  
+  // Buff buttons
+  const buffRow = document.getElementById('buffFilterRow');
+  if (buffRow) {
+    buffRow.style.display = filterState.activeTroop ? 'flex' : 'none';
+  }
+  
+  BUFF_TYPES.forEach(buff => {
+    const btn = document.getElementById(`filter-buff-${buff}`);
+    if (btn) {
+      if (filterState.activeBuff === buff) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    }
+  });
+  
+  // Debuff type buttons
+  const debuffTypeRow = document.getElementById('debuffTypeFilterRow');
+  if (debuffTypeRow) {
+    debuffTypeRow.style.display = (filterState.activeBuff === 'debuff') ? 'flex' : 'none';
+  }
+  
+  DEBUFF_TYPES.forEach(debuffType => {
+    const btn = document.getElementById(`filter-debuff-${debuffType}`);
+    if (btn) {
+      if (filterState.activeDebuffType === debuffType) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    }
+  });
+}
 
 // Wall General filter state
 const wallGeneralFilters = {
@@ -163,67 +321,29 @@ function isAttackingBuff(name) {
   return /^attacking\b/.test(norm);
 }
 
+// Check if a buff is "when defending"
+function isWhenDefendingBuff(name) {
+  const norm = normStatKey(name);
+  return /^when defending\b/.test(norm) || /^while defending\b/.test(norm);
+}
+
 // Check if a buff is "in-city"
 function isInCityBuff(name) {
   const norm = normStatKey(name);
   return /^in[-\s]?city\b/.test(norm);
 }
 
-// Determine if a line should be included based on wall general filters
-function shouldIncludeLine(line, domain) {
-  // If "Hide Attacking Buffs" is checked, exclude attacking buffs
-  if (wallGeneralFilters.hideAttacking && isAttackingBuff(line.name)) {
-    return false;
-  }
+shouldIncludeLine
   
   // If "Show as Wall General" is NOT checked, normal behavior
   if (!wallGeneralFilters.showAsWallGeneral) {
     return true;
   }
   
-  // Wall General mode: show field buffs (standard) + in-city buffs together
-  // This means we want to include:
-  // - All field domain buffs (they become base buffs)
-  // - All inCity domain buffs (they stack with field)
-  // - But NOT attacking buffs (already filtered above if hideAttacking is true)
-  
   return true; // Include by default in wall general mode
 }
 
 
-// Update button states
-function updateFilterButtons() {
-  // Troop buttons
-  TROOP_TYPES.forEach(troop => {
-    const btn = document.getElementById(`filter-troop-${troop}`);
-    if (btn) {
-      if (filterState.activeTroop === troop) {
-        btn.classList.add('active');
-      } else {
-        btn.classList.remove('active');
-      }
-    }
-  });
-  
-  // Buff buttons
-  const buffRow = document.getElementById('buffFilterRow');
-  if (buffRow) {
-    buffRow.style.display = filterState.activeTroop ? 'flex' : 'none';
-  }
-  
-  BUFF_TYPES.forEach(buff => {
-    const btn = document.getElementById(`filter-buff-${buff}`);
-    if (btn) {
-      if (filterState.activeBuff === buff) {
-        btn.classList.add('active');
-      } else {
-        btn.classList.remove('active');
-      }
-    }
-  });
-}
-
-// ADD THESE HERE ↓
   // Preferred set display order
   const SET_ORDER = ['dragon', 'ares', 'ach', 'imperial', 'parthian', 'asura', 'apollo'];
 
@@ -253,8 +373,6 @@ function updateFilterButtons() {
     const idx = SET_ORDER.indexOf(key);
     return idx === -1 ? 999 : idx;
   }
-  // END OF SET-ORDER CODE ↑
-
 
   // Normalizers
   function normalizeSlot(s) {
@@ -292,6 +410,7 @@ function updateFilterButtons() {
     div.innerHTML = `<strong>⚠️ Error:</strong> ${message}`;
     container.insertBefore(div, container.firstChild);
   }
+
 // Recompute the "X items" badge for each tier header based on visible cards
 function updateTierCounts() {
   document.querySelectorAll('#itemModal .tier-section').forEach(section => {
@@ -301,7 +420,7 @@ function updateTierCounts() {
         const idx = parseInt(card.dataset.itemIdx, 10);
         if (isNaN(idx) || idx < 0) return false;
 
-        // Check visibility. Prefer style check; if using CSS toggles, also check offsetParent.
+        // Check visibility
         return card.style.display !== 'none';
       }).length;
 
@@ -426,6 +545,7 @@ function setOrderIndex(str) {
   const idx = SET_ORDER.indexOf(key);
   return idx === -1 ? 999 : idx;
 }
+
 // Safely escape any text we inject into HTML
 function esc(s) {
   const div = document.createElement('div');
@@ -451,9 +571,10 @@ function getAttributesArray(item) {
 window.openGearModal = function openGearModal(slot) {
   S.currentSlot = slot;
   
-  // Reset filters when opening modal
+  // Reset buff filters when opening modal, but keep tier filter
   filterState.activeTroop = null;
   filterState.activeBuff = null;
+  filterState.activeDebuffType = null;
   
   const modal = document.getElementById('itemModal');
   const modalTitle = document.getElementById('modalTitle');
@@ -466,8 +587,20 @@ window.openGearModal = function openGearModal(slot) {
 
   modalTitle.textContent = `Select ${SLOT_LABELS[slot] || slot}`;
 
-  // Items for this slot
-  const slotItems = S.allItems.filter((item) => (item.slot || '').toLowerCase() === slot);
+  // Items for this slot, filtered by tier type
+  const slotItems = S.allItems.filter((item) => {
+    if ((item.slot || '').toLowerCase() !== slot) return false;
+    
+    // Check tier filter
+    const itemTierType = (item.tier || '').toLowerCase();
+    const isCivilization = itemTierType.includes('civilization');
+    const isStandard = !isCivilization;
+    
+    if (filterState.itemTier === 'civilization') return isCivilization;
+    if (filterState.itemTier === 'standard') return isStandard;
+    
+    return true;
+  });
 
   // Prefer grouping by setname if any item has it; else group by tier
   const itemsHaveSet = slotItems.some((it) => getItemSetName(it).length > 0);
@@ -480,7 +613,30 @@ window.openGearModal = function openGearModal(slot) {
     (groups[key] ||= []).push(item);
   });
 
-  // Filter buttons HTML
+  // Item tier filter buttons HTML
+  const tierFilterHtml = `
+    <div class="filter-section">
+      <div class="filter-label">Item Type:</div>
+      <div class="filter-buttons" id="tierFilterRow">
+        <button 
+          class="filter-btn" 
+          id="filter-tier-standard"
+          onclick="toggleItemTier('standard')"
+        >
+          Standard
+        </button>
+        <button 
+          class="filter-btn" 
+          id="filter-tier-civilization"
+          onclick="toggleItemTier('civilization')"
+        >
+          Civilization
+        </button>
+      </div>
+    </div>
+  `;
+
+  // Troop filter buttons HTML
   const troopFilterHtml = `
     <div class="filter-section">
       <div class="filter-label">Filter by Troop Type:</div>
@@ -496,6 +652,10 @@ window.openGearModal = function openGearModal(slot) {
         `).join('')}
       </div>
     </div>
+  `;
+
+  // Buff filter buttons HTML
+  const buffFilterHtml = `
     <div class="filter-section" id="buffFilterRow" style="display:none;">
       <div class="filter-label">Filter by Buff Type:</div>
       <div class="filter-buttons">
@@ -512,11 +672,32 @@ window.openGearModal = function openGearModal(slot) {
     </div>
   `;
 
+  // Debuff type filter buttons HTML
+  const debuffTypeFilterHtml = `
+    <div class="filter-section" id="debuffTypeFilterRow" style="display:none;">
+      <div class="filter-label">Debuff Type:</div>
+      <div class="filter-buttons">
+        ${DEBUFF_TYPES.map(debuffType => `
+          <button 
+            class="filter-btn" 
+            id="filter-debuff-${debuffType}"
+            onclick="toggleDebuffTypeFilter('${debuffType}')"
+          >
+            ${debuffType.charAt(0).toUpperCase() + debuffType.slice(1)}
+          </button>
+        `).join('')}
+      </div>
+    </div>
+  `;
+
   let html = `
     <div class="search-container">
       <input type="text" id="itemSearch" class="search-input" placeholder="🔍 Search items..." onkeyup="filterItems()">
     </div>
+    ${tierFilterHtml}
     ${troopFilterHtml}
+    ${buffFilterHtml}
+    ${debuffTypeFilterHtml}
     <div class="item-card" data-item-idx="-1">
       <div class="item-name">❌ Remove Item</div>
       <div class="item-attributes">Clear this slot</div>
@@ -586,8 +767,8 @@ window.openGearModal = function openGearModal(slot) {
     `;
   });
 
-  if (!groupNames.length) {
-    html = '<p style="text-align:center;color:#888;">No items available for this slot</p>';
+    if (!groupNames.length) {
+    html += '<p style="text-align:center;color:#888;">No items available for this slot</p>';
   }
 
   modalBody.innerHTML = html;
@@ -640,15 +821,8 @@ window.filterItems = function filterItems() {
     card.style.display = (searchMatches && filterMatches) ? 'block' : 'none';
   });
 
-  // NEW: refresh counts and section visibility
+  // Refresh counts and section visibility
   updateTierCounts();
-  
-  // Update section visibility
-  document.querySelectorAll('.tier-section').forEach(section => {
-    const visibleCards = Array.from(section.querySelectorAll('.item-card'))
-      .filter(card => card.style.display !== 'none');
-    section.style.display = visibleCards.length > 0 ? 'block' : 'none';
-  });
 };
 
   window.selectItem =
@@ -681,7 +855,6 @@ function updateGearDisplay() {
     const contentEl = slotEl.querySelector('.gear-slot-content');
     const item = S.equippedGear[slot];
 
-    // NEW: caption under the box
     const captionEl = document.querySelector(`.slot-caption[data-slot-caption="${slot}"]`);
 
     if (item) {
@@ -729,43 +902,138 @@ function normStatKey(s) {
     .trim();
 }
 
+// Extract multiple troop types from attribute text
+function extractTroopsFromAttr(attrText) {
+  const lower = attrText.toLowerCase();
+  const foundTroops = [];
+  
+  // Check for explicit "and" combinations like "ground and mounted"
+  const andPattern = /(ground|ranged|mounted|siege)\s+and\s+(ground|ranged|mounted|siege)/i;
+  const andMatch = lower.match(andPattern);
+  
+  if (andMatch) {
+    foundTroops.push(andMatch[1]);
+    foundTroops.push(andMatch[2]);
+    return foundTroops;
+  }
+  
+  // Check for comma-separated like "ground, mounted"
+  const commaPattern = /(ground|ranged|mounted|siege)\s*,\s*(ground|ranged|mounted|siege)/i;
+  const commaMatch = lower.match(commaPattern);
+  
+  if (commaMatch) {
+    foundTroops.push(commaMatch[1]);
+    foundTroops.push(commaMatch[2]);
+    return foundTroops;
+  }
+  
+  // Single troop type
+  for (const troop of TROOP_TYPES) {
+    if (lower.includes(troop)) {
+      foundTroops.push(troop);
+      break; // Only find the first one if no "and" or comma
+    }
+  }
+  
+  return foundTroops;
+}
+
+// Parse complex multi-troop, multi-buff attributes
+function parseComplexAttribute(attrText) {
+  const results = [];
+  
+  // Check for "When Defending" prefix
+  const whenDefendingMatch = attrText.match(/^(when|while)\s+defending\s+(.+)$/i);
+  const isDefending = !!whenDefendingMatch;
+  const workingText = isDefending ? whenDefendingMatch[2] : attrText;
+  
+  // Check for "In-City" prefix
+  const inCityMatch = workingText.match(/^in[-\s]?city\s+(.+)$/i);
+  const isInCity = !!inCityMatch;
+  const mainText = isInCity ? inCityMatch[1] : workingText;
+  
+  // Check for "Attacking" prefix
+  const attackingMatch = mainText.match(/^attacking\s+(.+)$/i);
+  const isAttacking = !!attackingMatch;
+  const contentText = isAttacking ? attackingMatch[1] : mainText;
+  
+  // Match pattern: "Troop1 and Troop2 Troop Buff1 and Buff2 +Value%"
+  // Example: "Mounted and Ranged Troop Attack and Defense +15%"
+  const complexPattern = /^((?:ground|ranged|mounted|siege)(?:\s+and\s+(?:ground|ranged|mounted|siege))*)\s+troop(?:'?s?)?\s+((?:attack|defense|hp)(?:\s+and\s+(?:attack|defense|hp))*)\s*([+-]?\d[\d,]*(?:\.\d+)?)\s*(%?)$/i;
+  
+  const match = contentText.trim().match(complexPattern);
+  
+  if (!match) {
+    return null; // Not a complex multi-attribute
+  }
+  
+  const troopsPart = match[1];
+  const buffsPart = match[2];
+  const valueStr = match[3].replace(/,/g, '');
+  const isPercent = match[4] === '%';
+  const value = parseFloat(valueStr);
+  
+  if (isNaN(value)) return null;
+  
+  // Extract troop types
+  const troops = [];
+  const troopMatches = troopsPart.toLowerCase().matchAll(/(ground|ranged|mounted|siege)/g);
+  for (const m of troopMatches) {
+    if (!troops.includes(m[1])) troops.push(m[1]);
+  }
+  
+  // Extract buff types
+  const buffs = [];
+  const buffMatches = buffsPart.toLowerCase().matchAll(/(attack|defense|hp)/g);
+  for (const m of buffMatches) {
+    if (!buffs.includes(m[1])) buffs.push(m[1]);
+  }
+  
+  // Determine domain
+  let domain = 'field';
+  if (isInCity) domain = 'inCity';
+  
+  // Generate all combinations
+  troops.forEach(troop => {
+    buffs.forEach(buff => {
+      results.push({
+        troop,
+        buff,
+        value,
+        isPercent,
+        originalText: attrText,
+        domain,
+        isAttacking,
+        isDefending
+      });
+    });
+  });
+  
+  return results.length > 0 ? results : null;
+}
+
 // Determine domain/troop/attacking/substat classification
 function classifyStat(rawName) {
-  let s = normStatKey(rawName); // e.g., "in city attacking ground attack"
-  let domain = 'field'; // 'field' | 'inCity' | 'march' | 'other'
+  let s = normStatKey(rawName);
+  let domain = 'field';
   let attacking = false;
-  let troop = null;     // 'ground' | 'ranged' | 'mounted' | 'siege' | null
-  let substat = 'other';// 'attack' | 'hp' | 'defense' | 'other'
-// ADD THIS NEW HELPER after the classifyStat function:
-
-// Check if a stat is a conditional "Attacking" all-troop bonus
-function isAttackingAllTroopBonus(rawName) {
-  const norm = normStatKey(rawName);
-  // Match patterns like "attacking troop's attack", "attacking troop attack", etc.
-  return /^attacking\s+troop'?s?\s+attack\b/.test(norm) || 
-         /^attacking\s+troops?\s+attack\b/.test(norm);
-}
-
-// Check if a stat is a conditional "Attacking" all-troop defense
-function isAttackingAllTroopDefense(rawName) {
-  const norm = normStatKey(rawName);
-  return /^attacking\s+troop'?s?\s+def(ense)?\b/.test(norm) || 
-         /^attacking\s+troops?\s+def(ense)?\b/.test(norm);
-}
-
-// Check if a stat is a conditional "Attacking" all-troop HP
-function isAttackingAllTroopHP(rawName) {
-  const norm = normStatKey(rawName);
-  return /^attacking\s+troop'?s?\s+hp\b/.test(norm) || 
-         /^attacking\s+troops?\s+hp\b/.test(norm);
-}
+  let defending = false; // NEW: track defending buffs
+  let troops = [];
+  let substat = 'other';
 
   // March
   if (/^march size\b/.test(s) || /^march capacity\b/.test(s)) {
-    return { domain: 'march', attacking, troop, substat, label: rawName };
+    return { domain: 'march', attacking, defending, troops, substat, label: rawName };
   }
   if (/^march speed\b/.test(s)) {
-    return { domain: 'march', attacking, troop, substat, label: rawName };
+    return { domain: 'march', attacking, defending, troops, substat, label: rawName };
+  }
+
+  // When Defending (NEW)
+  if (/^when defending\b/.test(s) || /^while defending\b/.test(s)) {
+    defending = true;
+    domain = 'field'; // Defending buffs apply in field context
+    s = s.replace(/^(?:when|while) defending\s+/, '');
   }
 
   // In-City
@@ -780,11 +1048,29 @@ function isAttackingAllTroopHP(rawName) {
     s = s.replace(/^attacking\s+/, '');
   }
 
-  // Troop detection
-  const troopMatch = s.match(/^(ground|ranged|mounted|siege)\b/);
-  if (troopMatch) {
-    troop = troopMatch[1];
-    s = s.replace(/^(ground|ranged|mounted|siege)\s+/, '');
+  // Multi-troop detection: "ground and mounted", "ground, mounted", etc.
+  const andPattern = /(ground|ranged|mounted|siege)\s+and\s+(ground|ranged|mounted|siege)\b/;
+  const andMatch = s.match(andPattern);
+  
+  if (andMatch) {
+    troops.push(andMatch[1], andMatch[2]);
+    s = s.replace(andPattern, '');
+  } else {
+    // Comma-separated: "ground, mounted"
+    const commaPattern = /(ground|ranged|mounted|siege)\s*,\s*(ground|ranged|mounted|siege)\b/;
+    const commaMatch = s.match(commaPattern);
+    
+    if (commaMatch) {
+      troops.push(commaMatch[1], commaMatch[2]);
+      s = s.replace(commaPattern, '');
+    } else {
+      // Single troop
+      const troopMatch = s.match(/^(ground|ranged|mounted|siege)\b/);
+      if (troopMatch) {
+        troops.push(troopMatch[1]);
+        s = s.replace(/^(ground|ranged|mounted|siege)\s+/, '');
+      }
+    }
   }
 
   // Substat detection
@@ -796,15 +1082,12 @@ function isAttackingAllTroopHP(rawName) {
   // All Troop special (applies to all troop types)
   const isAllTroop = /^all\s+troop(s)?\b/.test(normStatKey(rawName));
 
-  return { domain, attacking, troop, substat, isAllTroop, label: rawName };
+  return { domain, attacking, defending, troops, substat, isAllTroop, label: rawName };
 }
-
-// ADD THESE HELPER FUNCTIONS (place them after the classifyStat function):
 
 // Check if a stat is a conditional "Attacking" all-troop bonus
 function isAttackingAllTroopBonus(rawName) {
   const norm = normStatKey(rawName);
-  // Match patterns like "attacking troop's attack", "attacking troop attack", etc.
   return /^attacking\s+troop'?s?\s+attack\b/.test(norm) || 
          /^attacking\s+troops?\s+attack\b/.test(norm);
 }
@@ -835,13 +1118,9 @@ function makeTotalsStruct() {
 }
 
 // Add a line into totals
-// replicated=true is only passed when we intentionally duplicate (e.g., All Troop)
 function addLine(totals, domain, troop, substat, displayName, value, isPercent, source, replicated = false) {
   if (domain === 'field' || domain === 'inCity') {
     if (!troop) {
-      // No troop specified: do NOT auto-replicate; treat as "other" within this domain
-      // This respects your rule: only place into troop categories when explicitly matched,
-      // otherwise it will be visible in "Other" section (or March).
       totals.other.lines.push({ name: displayName, value, isPercent, source });
       return;
     }
@@ -867,8 +1146,6 @@ function addLine(totals, domain, troop, substat, displayName, value, isPercent, 
 }
 
 // Render a troop card with Attack/Defense/HP breakdown
-// Render a troop card with Attack/Defense/HP breakdown
-// Render a troop card with Attack/Defense/HP breakdown (respecting filters)
 function renderTroopCard(title, bucket, groupKey) {
   if (!bucket.lines.length) return '';
   
@@ -945,8 +1222,6 @@ function renderTroopCard(title, bucket, groupKey) {
   `;
 }
 
-// Calculate condensed header: G/R/M/S with A/D/H breakdown
-// Generate a clean table of totals for the header
 // Generate a clean table of totals for the header with filter checkboxes
 function condensedHeaderTable(totals) {
   const troops = [
@@ -965,7 +1240,7 @@ function condensedHeaderTable(totals) {
           ${wallGeneralFilters.hideAttacking ? 'checked' : ''}
           onchange="toggleWallFilter('hideAttacking')"
         />
-        <span>Hide Attacking Buffs</span>
+        <span>Reinforcement</span>
         
       </label>
       
@@ -993,9 +1268,6 @@ function condensedHeaderTable(totals) {
       </thead>
       <tbody>
   `;
-
-  // Determine which totals to show based on wall general mode
-  const displaySource = wallGeneralFilters.showAsWallGeneral ? 'combined' : 'field';
 
   troops.forEach(troop => {
     let attack = 0, defense = 0, hp = 0, total = 0;
@@ -1078,48 +1350,76 @@ function condensedHeaderTable(totals) {
 function updateStatsDisplay() {
   const totals = makeTotalsStruct();
 
-  // 1) Gear stats
+        // 1) Gear stats
   Object.values(S.equippedGear).forEach(item => {
     if (!item) return;
-    const tokens = getStatTokens(getAttributesString(item));
-    tokens.forEach(tok => {
-      const cls = classifyStat(tok.rawName);
+    const attrString = getAttributesString(item);
+    const attrLines = attrString.split(/[,;]+/).map(s => s.trim()).filter(Boolean);
+    
+    attrLines.forEach(attrLine => {
+      // First, try to parse as complex multi-troop, multi-buff attribute
+      const complexParsed = parseComplexAttribute(attrLine);
       
-      // Check for "Attacking Troop's X" bonuses
-      if (isAttackingAllTroopBonus(tok.rawName)) {
-        // Add to all troops in field, attack substat
-        ['ground','ranged','mounted','siege'].forEach(t => {
-          addLine(totals, 'field', t, 'attack', tok.rawName, tok.value, tok.isPercent, 'gear', true);
-        });
-        return;
-      }
-      if (isAttackingAllTroopDefense(tok.rawName)) {
-        ['ground','ranged','mounted','siege'].forEach(t => {
-          addLine(totals, 'field', t, 'defense', tok.rawName, tok.value, tok.isPercent, 'gear', true);
-        });
-        return;
-      }
-      if (isAttackingAllTroopHP(tok.rawName)) {
-        ['ground','ranged','mounted','siege'].forEach(t => {
-          addLine(totals, 'field', t, 'hp', tok.rawName, tok.value, tok.isPercent, 'gear', true);
+            if (complexParsed) {
+        // Handle complex attributes like "Mounted and Ranged Troop Attack and Defense +15%"
+        complexParsed.forEach(parsed => {
+          const substat = parsed.buff === 'defense' ? 'defense' : 
+                         parsed.buff === 'hp' ? 'hp' : 
+                         parsed.buff === 'attack' ? 'attack' : 'other';
+          
+          addLine(totals, parsed.domain, parsed.troop, substat, parsed.originalText, parsed.value, parsed.isPercent, 'gear', true);
         });
         return;
       }
       
-      // Regular "All Troop" handling
-      if (cls.isAllTroop) {
-        ['ground','ranged','mounted','siege'].forEach(t => {
-          addLine(totals, cls.domain, t, cls.substat, tok.rawName, tok.value, tok.isPercent, 'gear', true);
-        });
-      } else if (cls.domain === 'field' || cls.domain === 'inCity') {
-        addLine(totals, cls.domain, cls.troop, cls.substat, tok.rawName, tok.value, tok.isPercent, 'gear');
-      } else {
-        addLine(totals, cls.domain, null, cls.substat, tok.rawName, tok.value, tok.isPercent, 'gear');
-      }
+      // Fall back to regular token parsing
+      const tokens = getStatTokens(attrLine);
+      tokens.forEach(tok => {
+        const cls = classifyStat(tok.rawName);
+        
+        // Check for "Attacking Troop's X" bonuses
+        if (isAttackingAllTroopBonus(tok.rawName)) {
+          ['ground','ranged','mounted','siege'].forEach(t => {
+            addLine(totals, 'field', t, 'attack', tok.rawName, tok.value, tok.isPercent, 'gear', true);
+          });
+          return;
+        }
+        if (isAttackingAllTroopDefense(tok.rawName)) {
+          ['ground','ranged','mounted','siege'].forEach(t => {
+            addLine(totals, 'field', t, 'defense', tok.rawName, tok.value, tok.isPercent, 'gear', true);
+          });
+          return;
+        }
+        if (isAttackingAllTroopHP(tok.rawName)) {
+          ['ground','ranged','mounted','siege'].forEach(t => {
+            addLine(totals, 'field', t, 'hp', tok.rawName, tok.value, tok.isPercent, 'gear', true);
+          });
+          return;
+        }
+        
+        // Regular "All Troop" handling
+        if (cls.isAllTroop) {
+          ['ground','ranged','mounted','siege'].forEach(t => {
+            addLine(totals, cls.domain, t, cls.substat, tok.rawName, tok.value, tok.isPercent, 'gear', true);
+          });
+        } else if (cls.domain === 'field' || cls.domain === 'inCity') {
+          // Multi-troop handling: replicate to each troop type
+          if (cls.troops.length > 0) {
+            cls.troops.forEach(troopType => {
+              addLine(totals, cls.domain, troopType, cls.substat, tok.rawName, tok.value, tok.isPercent, 'gear', cls.troops.length > 1);
+            });
+          } else {
+            addLine(totals, cls.domain, null, cls.substat, tok.rawName, tok.value, tok.isPercent, 'gear');
+          }
+        } else {
+          addLine(totals, cls.domain, null, cls.substat, tok.rawName, tok.value, tok.isPercent, 'gear');
+        }
+      });
     });
   });
 
-  // Calculate set bonus counts
+
+// Calculate set bonus counts
   const counts = {};
   Object.values(S.equippedGear).forEach(item => {
     if (!item) return;
@@ -1128,58 +1428,81 @@ function updateStatsDisplay() {
     counts[key] = (counts[key] || 0) + 1;
   });
 
-  // 2) Active set bonuses
+   // 2) Active set bonuses
   Object.entries(counts).forEach(([normKey, count]) => {
     const entry = S.setBonusIndex[normKey];
     if (!entry) return;
     [2,4,6].forEach(pc => {
       const text = entry.pieces?.[pc] || '';
       if (count >= pc && text) {
-        const tokens = getStatTokens(text);
-        tokens.forEach(tok => {
-          const cls = classifyStat(tok.rawName);
-          const nameWithTag = tok.rawName;
-
-          // Check for "Attacking Troop's X" bonuses in set bonuses
-          if (isAttackingAllTroopBonus(tok.rawName)) {
-            ['ground','ranged','mounted','siege'].forEach(t => {
-              addLine(totals, 'field', t, 'attack', nameWithTag, tok.value, tok.isPercent, 'set', true);
-            });
-            return;
-          }
-          if (isAttackingAllTroopDefense(tok.rawName)) {
-            ['ground','ranged','mounted','siege'].forEach(t => {
-              addLine(totals, 'field', t, 'defense', nameWithTag, tok.value, tok.isPercent, 'set', true);
-            });
-            return;
-          }
-          if (isAttackingAllTroopHP(tok.rawName)) {
-            ['ground','ranged','mounted','siege'].forEach(t => {
-              addLine(totals, 'field', t, 'hp', nameWithTag, tok.value, tok.isPercent, 'set', true);
+        const attrLines = text.split(/[,;]+/).map(s => s.trim()).filter(Boolean);
+        
+        attrLines.forEach(attrLine => {
+          // First, try to parse as complex multi-troop, multi-buff attribute
+          const complexParsed = parseComplexAttribute(attrLine);
+          
+                    if (complexParsed) {
+            // Handle complex attributes
+            complexParsed.forEach(parsed => {
+              const substat = parsed.buff === 'defense' ? 'defense' : 
+                             parsed.buff === 'hp' ? 'hp' : 
+                             parsed.buff === 'attack' ? 'attack' : 'other';
+              
+              addLine(totals, parsed.domain, parsed.troop, substat, parsed.originalText, parsed.value, parsed.isPercent, 'set', true);
             });
             return;
           }
 
-          // Regular "All Troop" handling
-          if (cls.isAllTroop) {
-            ['ground','ranged','mounted','siege'].forEach(t => {
-              addLine(totals, cls.domain, t, cls.substat, nameWithTag, tok.value, tok.isPercent, 'set', true);
-            });
-          } else if (cls.domain === 'field' || cls.domain === 'inCity') {
-            if (cls.troop) {
-              addLine(totals, cls.domain, cls.troop, cls.substat, nameWithTag, tok.value, tok.isPercent, 'set');
-            } else {
-              addLine(totals, 'other', null, cls.substat, nameWithTag, tok.value, tok.isPercent, 'set');
+          
+          // Fall back to regular token parsing
+          const tokens = getStatTokens(attrLine);
+          tokens.forEach(tok => {
+            const cls = classifyStat(tok.rawName);
+            const nameWithTag = tok.rawName;
+
+            // Check for "Attacking Troop's X" bonuses in set bonuses
+            if (isAttackingAllTroopBonus(tok.rawName)) {
+              ['ground','ranged','mounted','siege'].forEach(t => {
+                addLine(totals, 'field', t, 'attack', nameWithTag, tok.value, tok.isPercent, 'set', true);
+              });
+              return;
             }
-          } else {
-            addLine(totals, cls.domain, null, cls.substat, nameWithTag, tok.value, tok.isPercent, 'set');
-          }
+            if (isAttackingAllTroopDefense(tok.rawName)) {
+              ['ground','ranged','mounted','siege'].forEach(t => {
+                addLine(totals, 'field', t, 'defense', nameWithTag, tok.value, tok.isPercent, 'set', true);
+              });
+              return;
+            }
+            if (isAttackingAllTroopHP(tok.rawName)) {
+              ['ground','ranged','mounted','siege'].forEach(t => {
+                addLine(totals, 'field', t, 'hp', nameWithTag, tok.value, tok.isPercent, 'set', true);
+              });
+              return;
+            }
+
+            // Regular "All Troop" handling
+            if (cls.isAllTroop) {
+              ['ground','ranged','mounted','siege'].forEach(t => {
+                addLine(totals, cls.domain, t, cls.substat, nameWithTag, tok.value, tok.isPercent, 'set', true);
+              });
+            } else if (cls.domain === 'field' || cls.domain === 'inCity') {
+              // Multi-troop handling: replicate to each troop type
+              if (cls.troops.length > 0) {
+                cls.troops.forEach(troopType => {
+                  addLine(totals, cls.domain, troopType, cls.substat, nameWithTag, tok.value, tok.isPercent, 'set', cls.troops.length > 1);
+                });
+              } else {
+                addLine(totals, 'other', null, cls.substat, nameWithTag, tok.value, tok.isPercent, 'set');
+              }
+            } else {
+              addLine(totals, cls.domain, null, cls.substat, nameWithTag, tok.value, tok.isPercent, 'set');
+            }
+          });
         });
       }
     });
   });
 
-  // 3) Render
   // 3) Render
   const statsDisplay = document.getElementById('statsDisplay');
   if (!statsDisplay) return;
@@ -1355,7 +1678,6 @@ function updateSetBonuses() {
   holder.innerHTML = html;
 }
 
-
   // Storage
   function saveToLocalStorage() {
     try { localStorage.setItem('evonyGearBuild', JSON.stringify(S.equippedGear)); } catch {}
@@ -1383,23 +1705,4 @@ function updateSetBonuses() {
     updateStatsDisplay();
     updateSetBonuses();
   });
-// Inside the IIFE, add this after DOMContentLoaded
-document.addEventListener('DOMContentLoaded', async () => {
-  await loadAllData();
-  loadFromLocalStorage();
-  updateGearDisplay();
-  updateStatsDisplay();
-  updateSetBonuses();
-  
-  // ADD THIS EVENT DELEGATION
-  document.querySelectorAll('.gear-slot').forEach(slot => {
-    slot.addEventListener('click', function() {
-      const slotType = this.dataset.slot;
-      if (slotType) {
-        window.openGearModal(slotType);
-      }
-    });
-  });
-});
-
 })();
