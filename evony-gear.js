@@ -333,16 +333,37 @@ function isInCityBuff(name) {
   return /^in[-\s]?city\b/.test(norm);
 }
 
-shouldIncludeLine
-  
-  // If "Show as Wall General" is NOT checked, normal behavior
-  if (!wallGeneralFilters.showAsWallGeneral) {
+// Determine if a stat line should be included based on reinforcement/wall filters
+function shouldIncludeLine(line, domain) {
+  const name = line?.name || '';
+  const isAttacking = isAttackingBuff(name);
+  const inCity = isInCityBuff(name);
+  const whenDefending = isWhenDefendingBuff(name);
+
+  // 1) Reinforcement mode (hide attacking buffs)
+  if (wallGeneralFilters.hideAttacking && isAttacking) {
+    return false;
+  }
+
+  // 2) Wall General mode
+  if (wallGeneralFilters.showAsWallGeneral) {
+    // Allow:
+    // - In-City buffs
+    // - "When/While Defending" buffs
+    // - Standard (non-conditional) buffs
+    // Disallow:
+    // - Attacking buffs
+    if (isAttacking) return false;
+    if (inCity) return true;
+    if (whenDefending) return true;
+
+    // Standard buff (no “attacking”, no “in-city”, no “when defending”)
     return true;
   }
-  
-  return true; // Include by default in wall general mode
-}
 
+  // 3) Normal mode: include everything by default
+  return true;
+}
 
   // Preferred set display order
   const SET_ORDER = ['dragon', 'ares', 'ach', 'imperial', 'parthian', 'asura', 'apollo'];
@@ -768,8 +789,8 @@ window.openGearModal = function openGearModal(slot) {
   });
 
     if (!groupNames.length) {
-    html += '<p style="text-align:center;color:#888;">No items available for this slot</p>';
-  }
+  html += '<p style="text-align:center;color:#888;">No items available for this slot</p>';
+}
 
   modalBody.innerHTML = html;
   modalBody._itemsCache = itemsFlat;
@@ -873,6 +894,22 @@ function updateGearDisplay() {
     }
   });
 }
+
+// Format stat values with proper sign handling
+// - Positive: "+45%"
+// - Negative: "-45%" (no extra plus)
+// - decimals: optional fixed decimals for percents in substat grids
+function formatStatValue(value, isPercent, opts = {}) {
+  const decimals = opts.decimals ?? null;
+
+  const magnitudeStr = decimals !== null
+    ? Math.abs(Number(value)).toFixed(decimals)
+    : Math.abs(Number(value)).toLocaleString();
+
+  const sign = Number(value) < 0 ? '-' : '+';
+  return `${sign}${magnitudeStr}${isPercent ? '%' : ''}`;
+}
+
 
 // Helpers to classify stats
 function getStatTokens(attributeString) {
@@ -1177,7 +1214,7 @@ function renderTroopCard(title, bucket, groupKey) {
           ${subLines.map(l => `
             <div class="substat-line ${l.source === 'set' ? 'set' : ''}">
               <div class="substat-name">${esc(l.name)}</div>
-              <div class="substat-value">${l.isPercent ? `+${l.value.toFixed(1)}%` : `+${l.value.toLocaleString()}`}</div>
+              <div class="substat-value">${formatStatValue(l.value, l.isPercent, { decimals: 1 })}</div>
             </div>
           `).join('')}
         </div>
@@ -1200,7 +1237,8 @@ function renderTroopCard(title, bucket, groupKey) {
       ${otherLines.map(l => `
         <div class="totals-line ${l.source === 'set' ? 'set' : ''}">
           <div class="name">${esc(l.name)}</div>
-          <div class="value">${l.isPercent ? `+${l.value.toLocaleString()}%` : `+${l.value.toLocaleString()}`}</div>
+          <div class="value">${formatStatValue(l.value, l.isPercent)}</div>
+
         </div>
       `).join('')}
     </div>
@@ -1574,7 +1612,7 @@ function updateStatsDisplay() {
             ${totals.march.lines.map(l => `
               <div class="totals-line ${l.source === 'set' ? 'set' : ''}">
                 <div class="name">${esc(l.name)}</div>
-                <div class="value">${l.isPercent ? `+${l.value.toLocaleString()}%` : `+${l.value.toLocaleString()}`}</div>
+                <div class="value">${formatStatValue(l.value, l.isPercent)}</div>
               </div>
             `).join('')}
           </div>
@@ -1594,7 +1632,7 @@ function updateStatsDisplay() {
             ${totals.other.lines.map(l => `
               <div class="totals-line ${l.source === 'set' ? 'set' : ''}">
                 <div class="name">${esc(l.name)}</div>
-                <div class="value">${l.isPercent ? `+${l.value.toLocaleString()}%` : `+${l.value.toLocaleString()}`}</div>
+                <div class="value">${formatStatValue(l.value, l.isPercent)}</div>
               </div>
             `).join('')}
           </div>
