@@ -9,6 +9,7 @@
    - Event delegation (no fragile inline JSON)
    - Idempotent initialization
    ========================================= */
+
 (function () {
   if (window.EvonyGearInitialized) {
     console.info('Evony Gear: already initialized; skipping.');
@@ -73,61 +74,86 @@ function extractBuffFromAttr(attrText) {
   return null;
 }
 
-// Check if an item matches the active filters using AND logic
-// Check if an item matches the active filters using AND logic
+// Check if an item matches the active filters using AND logic (modal filtering)
+// - Excludes "Attacking ..." conditional lines for normal buff filters (Attack/Defense/HP)
+// - Supports multi-troop attributes (e.g., "Ground and Mounted …")
+// - Supports multi-buff attributes (e.g., "Attack and Defense …")
+// - Debuff filter path is preserved
+// Check if an item matches the active filters using AND logic (modal filtering)
 function itemMatchesFilters(item) {
-  const attrs = getAttributesString(item).toLowerCase();
-  
-  // Check item tier filter first
+  // Tier filter first
   const itemTierType = (item.tier || '').toLowerCase();
   const isCivilization = itemTierType.includes('civilization');
   const isStandard = !isCivilization;
-  
+
   if (filterState.itemTier === 'civilization' && !isCivilization) return false;
   if (filterState.itemTier === 'standard' && !isStandard) return false;
-  
-  // No troop filter active = show all
-  if (!filterState.activeTroop) return true;
-  
-  // Get all attribute lines
-  const attrLines = getAttributesString(item).split(/[,;]+/).map(s => s.trim()).filter(Boolean);
-  
-  // Check if ANY attribute line matches ALL active filters (AND logic)
-  const hasMatchingLine = attrLines.some(line => {
-    const lineLower = line.toLowerCase();
-    
-    // Extract all troop types from this line (handles "Ground and Mounted")
-    const troopsInLine = extractTroopsFromAttr(line);
-    
-    // Must contain the selected troop type
-    if (!troopsInLine.includes(filterState.activeTroop)) return false;
-    
-    // If no buff filter, troop match is enough
-    if (!filterState.activeBuff) return true;
-    
-    // If debuff filter is active
-    if (filterState.activeBuff === 'debuff') {
-      // Must be a debuff line
-      if (!isDebuffAttribute(line)) return false;
-      
-      // If debuff type is selected, must match that type
+
+  const attrLines = (getAttributesString(item) || '')
+    .split(/[,;]+/)
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  // Helper keyword checks
+  const hasAttack = (s) => /\battack\b/i.test(s);
+  const hasDefense = (s) => /\bdef(ense)?\b/i.test(s);
+  const hasHP = (s) => /\bhp\b|\bhealth\b/i.test(s);
+
+  // Optional: treat "All Troop ..." as matching any troop
+  const includeAllTroopAsMatch = true;
+
+  // If Debuff filter is selected, allow it to work with/without troop
+  if (filterState.activeBuff === 'debuff') {
+    const matchesAnyDebuffLine = attrLines.some(line => {
+      if (!isDebuffAttribute(line)) return false; // must be debuff line
+
+      // If a Debuff Type was selected, it must match the line
       if (filterState.activeDebuffType) {
-        const buffType = extractBuffFromAttr(line);
-        return buffType === filterState.activeDebuffType;
+        if (filterState.activeDebuffType === 'attack' && !hasAttack(line)) return false;
+        if (filterState.activeDebuffType === 'defense' && !hasDefense(line)) return false;
+        if (filterState.activeDebuffType === 'hp' && !hasHP(line)) return false;
       }
-      
-      // Debuff selected but no specific type = show all debuffs for this troop
+
+      // If a troop is selected, require the line to mention that troop
+if (filterState.activeTroop) {
+  const lower = line.toLowerCase();
+  const allTroopOk = includeAllTroopAsMatch && /\ball\s+troops?\b/.test(lower);
+  const troopOk = allTroopOk || lower.includes(filterState.activeTroop);
+  if (!troopOk) return false;
+}
+
+
       return true;
-    }
-    
-    // Regular buff filter (attack, defense, hp)
-    // Must contain the buff type AND NOT be a debuff
-    if (isDebuffAttribute(line)) return false;
-    const buffType = extractBuffFromAttr(line);
-    return buffType === filterState.activeBuff;
+    });
+
+    return matchesAnyDebuffLine;
+  }
+
+  // If no troop filter and not in Debuff mode: show all (tier-only filter)
+  if (!filterState.activeTroop) return true;
+
+  // Normal buff path (Attack/Defense/HP): exclude Attacking conditionals and debuffs
+  const matchesAnyNormalLine = attrLines.some(line => {
+    if (isDebuffAttribute(line)) return false; // debuff lines don't belong here
+
+    const cls = classifyStat(line);
+    if (cls.attacking) return false; // exclude “Attacking ...” in normal buff search
+
+    // Troop match (supports multi-troop lines); allow "All Troop" if desired
+    const troopOk = (cls.isAllTroop && includeAllTroopAsMatch) ||
+                    (Array.isArray(cls.troops) && cls.troops.includes(filterState.activeTroop));
+    if (!troopOk) return false;
+
+    // Buff type match
+    if (!filterState.activeBuff) return true; // troop-only filter
+    if (filterState.activeBuff === 'attack')  return hasAttack(line);
+    if (filterState.activeBuff === 'defense') return hasDefense(line);
+    if (filterState.activeBuff === 'hp')      return hasHP(line);
+
+    return false;
   });
-  
-  return hasMatchingLine;
+
+  return matchesAnyNormalLine;
 }
 
 // Apply filters to visible items
@@ -167,13 +193,15 @@ window.toggleTroopFilter = function(troop) {
   if (filterState.activeTroop === troop) {
     // Turn off
     filterState.activeTroop = null;
-    filterState.activeBuff = null;
-    filterState.activeDebuffType = null;
+    // DON'T reset buff filters here - that's the issue!
+    // filterState.activeBuff = null;
+    // filterState.activeDebuffType = null;
   } else {
     // Turn on
     filterState.activeTroop = troop;
-    filterState.activeBuff = null;
-    filterState.activeDebuffType = null;
+    // DON'T reset buff filters here either!
+    // filterState.activeBuff = null;
+    // filterState.activeDebuffType = null;
   }
   
   updateFilterButtons();
@@ -182,8 +210,9 @@ window.toggleTroopFilter = function(troop) {
 
 // Toggle buff filter
 window.toggleBuffFilter = function(buff) {
-  if (!filterState.activeTroop) return; // Can't filter buff without troop
-  
+  // Allow Debuff even without troop; require troop for Attack/Defense/HP
+  if (!filterState.activeTroop && buff !== 'debuff') return;
+
   if (filterState.activeBuff === buff) {
     // Turn off
     filterState.activeBuff = null;
@@ -193,23 +222,18 @@ window.toggleBuffFilter = function(buff) {
     filterState.activeBuff = buff;
     filterState.activeDebuffType = null;
   }
-  
+
   updateFilterButtons();
   applyFilters();
 };
 
-// Toggle debuff type filter
+// Toggle debuff type filter (no troop required)
 window.toggleDebuffTypeFilter = function(debuffType) {
-  if (!filterState.activeTroop || filterState.activeBuff !== 'debuff') return;
-  
-  if (filterState.activeDebuffType === debuffType) {
-    // Turn off
-    filterState.activeDebuffType = null;
-  } else {
-    // Turn on
-    filterState.activeDebuffType = debuffType;
-  }
-  
+  if (filterState.activeBuff !== 'debuff') return;
+
+  filterState.activeDebuffType =
+    (filterState.activeDebuffType === debuffType) ? null : debuffType;
+
   updateFilterButtons();
   applyFilters();
 };
@@ -257,9 +281,10 @@ function updateFilterButtons() {
   
   // Buff buttons
   const buffRow = document.getElementById('buffFilterRow');
-  if (buffRow) {
-    buffRow.style.display = filterState.activeTroop ? 'flex' : 'none';
-  }
+if (buffRow) {
+  // Show row if a troop is selected OR Debuff is selected
+  buffRow.style.display = (filterState.activeTroop || filterState.activeBuff === 'debuff') ? 'flex' : 'none';
+}
   
   BUFF_TYPES.forEach(buff => {
     const btn = document.getElementById(`filter-buff-${buff}`);
@@ -274,9 +299,9 @@ function updateFilterButtons() {
   
   // Debuff type buttons
   const debuffTypeRow = document.getElementById('debuffTypeFilterRow');
-  if (debuffTypeRow) {
-    debuffTypeRow.style.display = (filterState.activeBuff === 'debuff') ? 'flex' : 'none';
-  }
+if (debuffTypeRow) {
+  debuffTypeRow.style.display = (filterState.activeBuff === 'debuff') ? 'flex' : 'none';
+}
   
   DEBUFF_TYPES.forEach(debuffType => {
     const btn = document.getElementById(`filter-debuff-${debuffType}`);
