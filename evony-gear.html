@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Evony Gear Calculator</title>
+  <title>Gear Calculator</title>
 
   <!-- External CSS: use the stage-based stylesheet you shared -->
-  <link rel="stylesheet" href="https://YOUR-DOMAIN.com/path/styles.css?v=2025-11-02-1">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Paulenski/evony-gear-loadout@d9686fe31671c841750e123ddadd884c0c30e4a0/evony-gear.css">
 </head>
 <body>
   <div class="container">
-    <h1>⚔️ Evony Gear Calculator ⚔️</h1>
+    <h1>⚔️ Gear Calculator ⚔️</h1>
 
     <!-- Optional action buttons -->
     <div class="action-buttons">
@@ -19,65 +19,64 @@
 
     <!-- Character-centric stage with left and right slot columns -->
     <div class="stage">
-      <!-- Left column: Weapon, Chest, Boots -->
-      <div class="slot-col left">
-        <div class="gear-slot" data-slot="weapon" onclick="openGearModal('weapon')" title="Weapon" aria-label="Weapon">
-          <!-- Replace emoji with your own 1:1 slot image if desired -->
-          <!-- <img class="slot-icon" src="https://YOUR-DOMAIN.com/slot-icons/weapon.png" alt="Weapon"> -->
-          <div class="slot-icon" style="display:grid;place-items:center;font-size:28px;">⚔️</div>
-          <div class="gear-slot-content"></div>
-          <div class="slot-name-tag">Weapon</div>
-        </div>
-
-        <div class="gear-slot" data-slot="chest" onclick="openGearModal('chest')" title="Chest Armor" aria-label="Chest Armor">
-          <!-- <img class="slot-icon" src="https://YOUR-DOMAIN.com/slot-icons/chest.png" alt="Chest Armor"> -->
-          <div class="slot-icon" style="display:grid;place-items:center;font-size:28px;">🛡️</div>
-          <div class="gear-slot-content"></div>
-          <div class="slot-name-tag">Chest Armor</div>
-        </div>
-
-        <div class="gear-slot" data-slot="boots" onclick="openGearModal('boots')" title="Boots" aria-label="Boots">
-          <!-- <img class="slot-icon" src="https://YOUR-DOMAIN.com/slot-icons/boots.png" alt="Boots"> -->
-          <div class="slot-icon" style="display:grid;place-items:center;font-size:28px;">👢</div>
-          <div class="gear-slot-content"></div>
-          <div class="slot-name-tag">Boots</div>
-        </div>
+  <!-- Left column -->
+  <div class="slot-col left">
+    <div class="slot-wrap">
+      <div class="gear-slot" data-slot="weapon" onclick="openGearModal('weapon')" title="Weapon" aria-label="Weapon">
+        <div class="slot-icon" style="display:grid;place-items:center;font-size:28px;">⚔️</div>
+        <div class="gear-slot-content"></div>
       </div>
-
-      <!-- Central general model placeholder -->
-     <div class="general-placeholder">
-  <img src="https://pc.evony.com/images/arthur.png" alt="General" class="general-image">
-</div>
-
-
-      <!-- Right column: Helmet, Legs, Ring -->
-      <div class="slot-col right">
-        <div class="gear-slot" data-slot="helmet" onclick="openGearModal('helmet')" title="Helmet" aria-label="Helmet">
-          <!-- <img class="slot-icon" src="https://YOUR-DOMAIN.com/slot-icons/helmet.png" alt="Helmet"> -->
-          <div class="slot-icon" style="display:grid;place-items:center;font-size:28px;">🪖</div>
-          <div class="gear-slot-content"></div>
-          <div class="slot-name-tag">Helmet</div>
-        </div>
-
-        <div class="gear-slot" data-slot="legs" onclick="openGearModal('legs')" title="Leg Armor" aria-label="Leg Armor">
-          <!-- <img class="slot-icon" src="https://YOUR-DOMAIN.com/slot-icons/legs.png" alt="Leg Armor"> -->
-          <div class="slot-icon" style="display:grid;place-items:center;font-size:28px;">👖</div>
-          <div class="gear-slot-content"></div>
-          <div class="slot-name-tag">Leg Armor</div>
-        </div>
-
-        <div class="gear-slot" data-slot="ring" onclick="openGearModal('ring')" title="Ring" aria-label="Ring">
-          <!-- <img class="slot-icon" src="https://YOUR-DOMAIN.com/slot-icons/ring.png" alt="Ring"> -->
-          <div class="slot-icon" style="display:grid;place-items:center;font-size:28px;">💍</div>
-          <div class="gear-slot-content"></div>
-          <div class="slot-name-tag">Ring</div>
-        </div>
-      </div>
+      <div class="slot-caption" data-slot-caption="weapon">Weapon</div>
     </div>
+
+    <div class="slot-wrap">
+      <div class="gear-slot" data-slot="chest" onclick="openGearModal('chest')" title="Chest Armor" aria-label="Chest Armor">
+        <div class="slot-icon" style="display:grid;place-items:center;font-size:28px;">🛡️</div>
+        <div class="gear-slot-content"></div>
+      </div>
+      <div class="slot-caption" data-slot-caption="chest">Chest Armor</div>
+    </div>
+
+    <div class="slot-wrap">
+      <div class="gear-slot" data-slot="boots" onclick="openGearModal('boots')" title="Boots" aria-label="Boots">
+        <div class="slot-icon" style="display:grid;place-items:center;font-size:28px;">👢</div>
+        <div class="gear-slot-content"></div>
+      </div>
+      <div class="slot-caption" data-slot-caption="boots">Boots</div>
+    </div>
+  </div>
+
+  <!-- Right column -->
+  <div class="slot-col right">
+    <div class="slot-wrap">
+      <div class="gear-slot" data-slot="helmet" onclick="openGearModal('helmet')" title="Helmet" aria-label="Helmet">
+        <div class="slot-icon" style="display:grid;place-items:center;font-size:28px;">🪖</div>
+        <div class="gear-slot-content"></div>
+      </div>
+      <div class="slot-caption" data-slot-caption="helmet">Helmet</div>
+    </div>
+
+    <div class="slot-wrap">
+      <div class="gear-slot" data-slot="legs" onclick="openGearModal('legs')" title="Leg Armor" aria-label="Leg Armor">
+        <div class="slot-icon" style="display:grid;place-items:center;font-size:28px;">👖</div>
+        <div class="gear-slot-content"></div>
+      </div>
+      <div class="slot-caption" data-slot-caption="legs">Leg Armor</div>
+    </div>
+
+    <div class="slot-wrap">
+      <div class="gear-slot" data-slot="ring" onclick="openGearModal('ring')" title="Ring" aria-label="Ring">
+        <div class="slot-icon" style="display:grid;place-items:center;font-size:28px;">💍</div>
+        <div class="gear-slot-content"></div>
+      </div>
+      <div class="slot-caption" data-slot-caption="ring">Ring</div>
+    </div>
+  </div>
+</div>
 
     <!-- Stats Summary -->
     <div class="stats-summary">
-      <h2>📊 Total Stats</h2>
+<span id="totalsCondensed" class="totals-condensed"></span>
       <div id="statsDisplay">
         <p style="text-align:center;color:#888;">Equip items to see stats</p>
       </div>
@@ -106,6 +105,6 @@
   </div>
 
   <!-- External JS: the idempotent script that fetches from your Apps Script backend -->
-  <script src="https://YOUR-DOMAIN.com/path/script.js?v=2025-11-02-1"></script>
+  <script src="https://cdn.jsdelivr.net/gh/Paulenski/evony-gear-loadout@9e50b8c8f3cec155cff147b45d884c504956809e/evony-gear.js"></script>
 </body>
 </html>
