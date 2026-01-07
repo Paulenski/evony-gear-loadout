@@ -1133,11 +1133,14 @@ function classifyStat(rawName) {
       troops.push(commaMatch[1], commaMatch[2]);
       s = s.replace(commaPattern, '');
     } else {
-      // Single troop
-      const troopMatch = s.match(/^(ground|ranged|mounted|siege)\b/);
-      if (troopMatch) {
-        troops.push(troopMatch[1]);
-        s = s.replace(/^(ground|ranged|mounted|siege)\s+/, '');
+      // Single troop - improved to find troop type anywhere in the string
+      for (const troop of ['ground', 'ranged', 'mounted', 'siege']) {
+        const troopPattern = new RegExp(`\\b${troop}\\b`, 'i');
+        if (troopPattern.test(s)) {
+          troops.push(troop);
+          s = s.replace(new RegExp(`\\b${troop}\\s*`, 'i'), '');
+          break;
+        }
       }
     }
   }
