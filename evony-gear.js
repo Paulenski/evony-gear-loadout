@@ -390,6 +390,13 @@ function shouldIncludeLine(line, domain) {
   return true;
 }
 
+
+  // Check if a stat is a Monster buff
+  function isMonsterBuff(rawName) {
+    const norm = normStatKey(rawName);
+    return /^monster(?:s)?\b/.test(norm);
+  }
+
   // Preferred set display order
   const SET_ORDER = ['dragon', 'ares', 'ach', 'imperial', 'parthian', 'asura', 'apollo'];
 
@@ -1342,24 +1349,24 @@ function condensedHeaderTable(totals) {
       
       // Filter out attacking buffs if needed, then sum
       const fieldAttack = fieldBucket.lines
-        .filter(l => l.substat === 'attack' && shouldIncludeLine(l, 'field'))
+        .filter(l => l.substat === 'attack' && shouldIncludeLine(l, 'field') && !isMonsterBuff(l.name))
         .reduce((sum, l) => sum + (l.isPercent ? l.value : 0), 0);
       const inCityAttack = inCityBucket.lines
-        .filter(l => l.substat === 'attack' && shouldIncludeLine(l, 'inCity'))
+        .filter(l => l.substat === 'attack' && shouldIncludeLine(l, 'inCity') && !isMonsterBuff(l.name))
         .reduce((sum, l) => sum + (l.isPercent ? l.value : 0), 0);
       
       const fieldDefense = fieldBucket.lines
-        .filter(l => l.substat === 'defense' && shouldIncludeLine(l, 'field'))
+        .filter(l => l.substat === 'defense' && shouldIncludeLine(l, 'field') && !isMonsterBuff(l.name))
         .reduce((sum, l) => sum + (l.isPercent ? l.value : 0), 0);
       const inCityDefense = inCityBucket.lines
-        .filter(l => l.substat === 'defense' && shouldIncludeLine(l, 'inCity'))
+        .filter(l => l.substat === 'defense' && shouldIncludeLine(l, 'inCity') && !isMonsterBuff(l.name))
         .reduce((sum, l) => sum + (l.isPercent ? l.value : 0), 0);
       
       const fieldHP = fieldBucket.lines
-        .filter(l => l.substat === 'hp' && shouldIncludeLine(l, 'field'))
+        .filter(l => l.substat === 'hp' && shouldIncludeLine(l, 'field') && !isMonsterBuff(l.name))
         .reduce((sum, l) => sum + (l.isPercent ? l.value : 0), 0);
       const inCityHP = inCityBucket.lines
-        .filter(l => l.substat === 'hp' && shouldIncludeLine(l, 'inCity'))
+        .filter(l => l.substat === 'hp' && shouldIncludeLine(l, 'inCity') && !isMonsterBuff(l.name))
         .reduce((sum, l) => sum + (l.isPercent ? l.value : 0), 0);
       
       attack = fieldAttack + inCityAttack;
@@ -1373,21 +1380,28 @@ function condensedHeaderTable(totals) {
       if (wallGeneralFilters.hideAttacking) {
         // Recalculate without attacking buffs
         attack = bucket.lines
-          .filter(l => l.substat === 'attack' && shouldIncludeLine(l, 'field'))
+          .filter(l => l.substat === 'attack' && shouldIncludeLine(l, 'field') && !isMonsterBuff(l.name))
           .reduce((sum, l) => sum + (l.isPercent ? l.value : 0), 0);
         defense = bucket.lines
-          .filter(l => l.substat === 'defense' && shouldIncludeLine(l, 'field'))
+          .filter(l => l.substat === 'defense' && shouldIncludeLine(l, 'field') && !isMonsterBuff(l.name))
           .reduce((sum, l) => sum + (l.isPercent ? l.value : 0), 0);
         hp = bucket.lines
-          .filter(l => l.substat === 'hp' && shouldIncludeLine(l, 'field'))
+          .filter(l => l.substat === 'hp' && shouldIncludeLine(l, 'field') && !isMonsterBuff(l.name))
           .reduce((sum, l) => sum + (l.isPercent ? l.value : 0), 0);
         total = attack + defense + hp;
       } else {
         // Use pre-calculated sums
-        attack = bucket.sum.attack;
-        defense = bucket.sum.defense;
-        hp = bucket.sum.hp;
-        total = bucket.sum.totalPct;
+        // Use pre-calculated sums but exclude Monster buffs
+          attack = bucket.lines
+            .filter(l => l.substat === 'attack' && !isMonsterBuff(l.name))
+            .reduce((sum, l) => sum + (l.isPercent ? l.value : 0), 0);
+          defense = bucket.lines
+            .filter(l => l.substat === 'defense' && !isMonsterBuff(l.name))
+            .reduce((sum, l) => sum + (l.isPercent ? l.value : 0), 0);
+          hp = bucket.lines
+            .filter(l => l.substat === 'hp' && !isMonsterBuff(l.name))
+            .reduce((sum, l) => sum + (l.isPercent ? l.value : 0), 0);
+          total = attack + defense + hp;
       }
     }
 
