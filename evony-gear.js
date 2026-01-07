@@ -75,7 +75,7 @@ function extractBuffFromAttr(attrText) {
 }
 
 // Check if an item matches the active filters using AND logic (modal filtering)
-// - Excludes "Attacking ..." conditional lines for normal buff filters (Attack/Defense/HP)
+// - Includes "Attacking ..." conditional lines for normal buff filters (Attack/Defense/HP)
 // - Supports multi-troop attributes (e.g., "Ground and Mounted …")
 // - Supports multi-buff attributes (e.g., "Attack and Defense …")
 // - Debuff filter path is preserved
@@ -132,12 +132,11 @@ if (filterState.activeTroop) {
   // If no troop filter and not in Debuff mode: show all (tier-only filter)
   if (!filterState.activeTroop) return true;
 
-  // Normal buff path (Attack/Defense/HP): exclude Attacking conditionals and debuffs
+  // Normal buff path (Attack/Defense/HP): exclude debuffs (attacking conditionals now included)
   const matchesAnyNormalLine = attrLines.some(line => {
     if (isDebuffAttribute(line)) return false; // debuff lines don't belong here
 
     const cls = classifyStat(line);
-    if (cls.attacking) return false; // exclude “Attacking ...” in normal buff search
 
     // Troop match (supports multi-troop lines); allow "All Troop" if desired
     const troopOk = (cls.isAllTroop && includeAllTroopAsMatch) ||
