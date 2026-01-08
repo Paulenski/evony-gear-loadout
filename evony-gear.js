@@ -1170,23 +1170,42 @@ function classifyStat(rawName) {
 // Check if a stat is a conditional "Attacking" all-troop bonus
 function isAttackingAllTroopBonus(rawName) {
   const norm = normStatKey(rawName);
-  return /^attacking\s+troop'?s?\s+attack\b/.test(norm) || 
-         /^attacking\s+troops?\s+attack\b/.test(norm);
+  return /\battacking\s+troop\'?s?\s+attack\b/i.test(norm) || 
+         /\battacking\s+troops?\s+attack\b/i.test(norm);
 }
 
 // Check if a stat is a conditional "Attacking" all-troop defense
 function isAttackingAllTroopDefense(rawName) {
   const norm = normStatKey(rawName);
-  return /^attacking\s+troop'?s?\s+def(ense)?\b/.test(norm) || 
-         /^attacking\s+troops?\s+def(ense)?\b/.test(norm);
+  return /\battacking\s+troop\'?s?\s+def(ense)?\b/i.test(norm) || 
+         /\battacking\s+troops?\s+def(ense)?\b/i.test(norm);
 }
 
 // Check if a stat is a conditional "Attacking" all-troop HP
 function isAttackingAllTroopHP(rawName) {
   const norm = normStatKey(rawName);
-  return /^attacking\s+troop'?s?\s+hp\b/.test(norm) || 
-         /^attacking\s+troops?\s+hp\b/.test(norm);
+  return /\battacking\s+troop\'?s?\s+hp\b/i.test(norm) || 
+         /\battacking\s+troops?\s+hp\b/i.test(norm);
 }
+
+// Check if a stat is a conditional "Attacking" single-troop bonus (e.g., "Attacking Ground Troop Attack")
+function isAttackingSingleTroopBonus(rawName) {
+  const norm = normStatKey(rawName);
+  return /\battacking\s+(ground|ranged|mounted|siege)\s+troops?\s+attack\b/i.test(norm);
+}
+
+// Check if a stat is a conditional "Attacking" single-troop defense
+function isAttackingSingleTroopDefense(rawName) {
+  const norm = normStatKey(rawName);
+  return /\battacking\s+(ground|ranged|mounted|siege)\s+troops?\s+def(ense)?\b/i.test(norm);
+}
+
+// Check if a stat is a conditional "Attacking" single-troop HP
+function isAttackingSingleTroopHP(rawName) {
+  const norm = normStatKey(rawName);
+  return /\battacking\s+(ground|ranged|mounted|siege)\s+troops?\s+hp\b/i.test(norm);
+}
+
 
 // Structure for grouped totals
 function makeTotalsStruct() {
@@ -1486,6 +1505,33 @@ function updateStatsDisplay() {
           });
           return;
         }
+
+        // Check for "Attacking [Troop Type] Troop X" bonuses (e.g., "Attacking Ground Troop Attack")
+        if (isAttackingSingleTroopBonus(tok.rawName)) {
+          const troopMatch = tok.rawName.match(/\battacking\s+(ground|ranged|mounted|siege)\s+troops?\s+attack\b/i);
+          if (troopMatch) {
+            const troopType = troopMatch[1].toLowerCase();
+            addLine(totals, 'field', troopType, 'attack', tok.rawName, tok.value, tok.isPercent, 'gear', true);
+          }
+          return;
+        }
+        if (isAttackingSingleTroopDefense(tok.rawName)) {
+          const troopMatch = tok.rawName.match(/\battacking\s+(ground|ranged|mounted|siege)\s+troops?\s+def(ense)?\b/i);
+          if (troopMatch) {
+            const troopType = troopMatch[1].toLowerCase();
+            addLine(totals, 'field', troopType, 'defense', tok.rawName, tok.value, tok.isPercent, 'gear', true);
+          }
+          return;
+        }
+        if (isAttackingSingleTroopHP(tok.rawName)) {
+          const troopMatch = tok.rawName.match(/\battacking\s+(ground|ranged|mounted|siege)\s+troops?\s+hp\b/i);
+          if (troopMatch) {
+            const troopType = troopMatch[1].toLowerCase();
+            addLine(totals, 'field', troopType, 'hp', tok.rawName, tok.value, tok.isPercent, 'gear', true);
+          }
+          return;
+        }
+
         
         // Regular "All Troop" handling
         if (cls.isAllTroop) {
@@ -1569,6 +1615,33 @@ function updateStatsDisplay() {
               });
               return;
             }
+
+            // Check for "Attacking [Troop Type] Troop X" bonuses in set bonuses
+            if (isAttackingSingleTroopBonus(tok.rawName)) {
+              const troopMatch = tok.rawName.match(/\battacking\s+(ground|ranged|mounted|siege)\s+troops?\s+attack\b/i);
+              if (troopMatch) {
+                const troopType = troopMatch[1].toLowerCase();
+                addLine(totals, 'field', troopType, 'attack', nameWithTag, tok.value, tok.isPercent, 'set', true);
+              }
+              return;
+            }
+            if (isAttackingSingleTroopDefense(tok.rawName)) {
+              const troopMatch = tok.rawName.match(/\battacking\s+(ground|ranged|mounted|siege)\s+troops?\s+def(ense)?\b/i);
+              if (troopMatch) {
+                const troopType = troopMatch[1].toLowerCase();
+                addLine(totals, 'field', troopType, 'defense', nameWithTag, tok.value, tok.isPercent, 'set', true);
+              }
+              return;
+            }
+            if (isAttackingSingleTroopHP(tok.rawName)) {
+              const troopMatch = tok.rawName.match(/\battacking\s+(ground|ranged|mounted|siege)\s+troops?\s+hp\b/i);
+              if (troopMatch) {
+                const troopType = troopMatch[1].toLowerCase();
+                addLine(totals, 'field', troopType, 'hp', nameWithTag, tok.value, tok.isPercent, 'set', true);
+              }
+              return;
+            }
+
 
             // Regular "All Troop" handling
             if (cls.isAllTroop) {
