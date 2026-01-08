@@ -840,6 +840,8 @@ window.openGearModal = function openGearModal(slot) {
   modal.style.display = 'block';
   // Reset scroll position to top when opening modal
   modalBody.scrollTop = 0;
+    // Prevent background scrolling when modal is open
+    document.body.classList.add('modal-open');
   updateFilterButtons();
 };
 
@@ -848,6 +850,8 @@ window.openGearModal = function openGearModal(slot) {
     function closeModal() {
       const modal = document.getElementById('itemModal');
       if (modal) modal.style.display = 'none';
+        // Restore background scrolling when modal is closed
+        document.body.classList.remove('modal-open');
     };
 
 window.filterItems = function filterItems() {

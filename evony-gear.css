@@ -1198,3 +1198,8 @@ h1 {
   color: #ffd700;
   font-weight: 800;
   background: rgba
+
+/* When modal is open, prevent background scrolling */
+body.modal-open {
+  overflow: hidden;
+}
