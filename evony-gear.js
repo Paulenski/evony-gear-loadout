@@ -393,7 +393,7 @@ function shouldIncludeLine(line, domain) {
   // Check if a stat is a Monster buff
   function isMonsterBuff(rawName) {
     const norm = normStatKey(rawName);
-    return /^monster(?:s)?\b/.test(norm);
+    return /\bmonster(?:s)?\b/.test(norm);
   }
 
   function isDebuffStat(rawName) {
