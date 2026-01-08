@@ -838,6 +838,8 @@ window.openGearModal = function openGearModal(slot) {
   };
 
   modal.style.display = 'block';
+  // Reset scroll position to top when opening modal
+  modalBody.scrollTop = 0;
   updateFilterButtons();
 };
 
